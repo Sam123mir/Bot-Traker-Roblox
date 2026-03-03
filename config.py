@@ -58,3 +58,4 @@ BOT_AVATAR_URL = "https://cdn-icons-png.flaticon.com/512/8157/8157523.png"
 ROBLOX_ICON    = "https://cdn-icons-png.flaticon.com/512/18868/18868601.png"
 ROBLOX_URL     = "https://www.roblox.com"
 OFFICIAL_SERVER_URL = "https://discord.gg/REPLACE_ME" # Placeholder for user's community server
+UPDATE_BANNER_URL   = "https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExNXpoZTZ4ZXg2NjFra3hqa3BwMHY4Mm5pemY0Mms3eTU4ZzRtNjd0NiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/7qJWn3LsiSe2WoOABJ/giphy.gif"

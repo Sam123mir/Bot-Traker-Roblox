@@ -22,7 +22,7 @@ from dotenv import load_dotenv
 # Cargar variables de entorno desde .env si existe
 load_dotenv()
 
-from config import DISCORD_BOT_TOKEN, DEVELOPERS, PLATFORMS, CHECK_INTERVAL, BOT_NAME, BOT_AVATAR_URL
+from config import DISCORD_BOT_TOKEN, DEVELOPERS, PLATFORMS, CHECK_INTERVAL, BOT_NAME, BOT_AVATAR_URL, UPDATE_BANNER_URL
 from core.checker import fetch_all, VersionInfo
 from core.storage import get_version_data, update_version, get_all_guilds, get_guild_config, set_guild_config, get_all_announcement_channels
 from core.notifier import build_update_embed, create_language_view
@@ -211,8 +211,8 @@ class AnnouncementModal(discord.ui.Modal, title='🚀 Create BloxPulse Update'):
         if self.image_url.value:
             embed.set_image(url=self.image_url.value)
         else:
-            # Add bot logo as a large image if no other image is provided for a "wow" factor
-            embed.set_image(url=BOT_AVATAR_URL)
+            # Use the official update banner GIF by default
+            embed.set_image(url=UPDATE_BANNER_URL)
         
         from config import OFFICIAL_SERVER_URL
         embed.add_field(
