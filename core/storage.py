@@ -11,7 +11,7 @@ import shutil
 from datetime import datetime, timezone
 from typing import Optional
 
-from config import VERSIONS_FILE, GUILDS_FILE
+from config import VERSIONS_FILE, GUILDS_FILE, ANNOUNCEMENTS_FILE
 
 logger = logging.getLogger("monitor.storage")
 
@@ -119,3 +119,20 @@ def get_all_announcement_channels() -> list[int]:
         if chan_id:
             channels.append(int(chan_id))
     return channels
+
+# ── Announcement History ──────────────────────────────────────
+
+def get_announcements() -> list[dict]:
+    """Returns the list of the last 3 announcements."""
+    data = _load_json(ANNOUNCEMENTS_FILE)
+    return data.get("history", [])
+
+def save_announcement(ann_data: dict) -> bool:
+    """Saves an announcement to history, keeping only the last 3."""
+    data = _load_json(ANNOUNCEMENTS_FILE)
+    history = data.get("history", [])
+    # Add to front
+    history.insert(0, ann_data)
+    # Keep last 3
+    data["history"] = history[:3]
+    return _save_json(ANNOUNCEMENTS_FILE, data)

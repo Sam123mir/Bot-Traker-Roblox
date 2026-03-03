@@ -24,7 +24,7 @@ load_dotenv()
 
 from config import DISCORD_BOT_TOKEN, DEVELOPERS, PLATFORMS, CHECK_INTERVAL, BOT_NAME, BOT_AVATAR_URL, UPDATE_BANNER_URL
 from core.checker import fetch_all, VersionInfo
-from core.storage import get_version_data, update_version, get_all_guilds, get_guild_config, set_guild_config, get_all_announcement_channels
+from core.storage import get_version_data, update_version, get_all_guilds, get_guild_config, set_guild_config, get_all_announcement_channels, save_announcement, get_announcements
 from core.notifier import build_update_embed, create_language_view
 from core.history import fetch_deploy_history, make_rdd_url
 from core.i18n import get_text
@@ -191,12 +191,20 @@ class AnnouncementModal(discord.ui.Modal, title='🚀 Create BloxPulse Update'):
 
     async def on_submit(self, interaction: discord.Interaction):
         # Build the preview embed
+        # Use user title directly but ensure it has the icon. 
+        # If user includes "BloxPulse" we don't need to add it again.
+        display_title = self.ann_title.value
+        if "BloxPulse" not in display_title:
+            display_title = f"BloxPulse: {display_title}"
+
+        # Format changes with blockquotes
+        formatted_changes = "\n".join([f"> {line}" for line in self.changes.value.split("\n") if line.strip()])
+
         embed = discord.Embed(
-            title=f"◈ BloxPulse Update: {self.ann_title.value}",
+            title=f"◈ {display_title}",
             description=(
-                f"**New Version**: `{self.version.value}`\n\n"
-                f"{self.changes.value}\n\n"
-                f"---"
+                f"*Nueva versión:* `{self.version.value}`\n\n"
+                f"{formatted_changes}"
             ),
             color=0x00FFBB,
             timestamp=datetime.now(timezone.utc)
@@ -205,8 +213,8 @@ class AnnouncementModal(discord.ui.Modal, title='🚀 Create BloxPulse Update'):
         
         from config import OFFICIAL_SERVER_URL
         embed.add_field(
-            name="🔗 Quick Links", 
-            value=f"[Official Community]({OFFICIAL_SERVER_URL}) • [Bot Invite](https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=8&scope=bot%20applications.commands)",
+            name="🔗 Enlaces rápidos", 
+            value=f"**[Comunidad oficial]({OFFICIAL_SERVER_URL})** | **[Invitación de bot](https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=8&scope=bot%20applications.commands)**",
             inline=False
         )
         
@@ -216,8 +224,17 @@ class AnnouncementModal(discord.ui.Modal, title='🚀 Create BloxPulse Update'):
             icon_url=BOT_AVATAR_URL
         )
 
+        # Store data for history (used in confirm)
+        self.ann_data = {
+            "title": display_title,
+            "version": self.version.value,
+            "changes": self.changes.value,
+            "footer": self.footer.value or "BloxPulse · The standard for Roblox Monitoring",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+
         # Show the preview view
-        view = AnnouncementReviewView(embed)
+        view = AnnouncementReviewView(embed, self.ann_data)
         await interaction.response.send_message(
             content="🔍 **Live Preview**: This is how the update will look. Check for typos!",
             embed=embed, 
@@ -228,13 +245,17 @@ class AnnouncementModal(discord.ui.Modal, title='🚀 Create BloxPulse Update'):
 
 class AnnouncementReviewView(discord.ui.View):
     """Stage 2: Confirm or Cancel the broadcast."""
-    def __init__(self, embed: discord.Embed):
+    def __init__(self, embed: discord.Embed, ann_data: dict):
         super().__init__(timeout=300)
         self.embed = embed
+        self.ann_data = ann_data
 
     @discord.ui.button(label="🚀 Send Broadcast", style=discord.ButtonStyle.success, emoji="🌍")
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
+        
+        # Save to history
+        save_announcement(self.ann_data)
         
         channels = get_all_announcement_channels()
         count = 0
@@ -1027,6 +1048,63 @@ async def language(interaction: discord.Interaction, lang: str):
 @is_owner()
 async def broadcast(interaction: discord.Interaction):
     await interaction.response.send_modal(AnnouncementModal())
+
+@bot.tree.command(name="updates", description="🕒 View the 3 most recent BloxPulse updates.")
+async def updates_history(interaction: discord.Interaction):
+    history = get_announcements()
+    if not history:
+        return await premium_response(interaction, "History Empty", "No announcements have been sent yet.", color=0xE74C3C)
+
+    view = UpdatesHistoryView(history)
+    await interaction.response.send_message("🔍 **Latest BloxPulse Updates**: Select one to view details.", view=view, ephemeral=True)
+
+
+class UpdatesHistorySelect(discord.ui.Select):
+    def __init__(self, history: list[dict]):
+        options = []
+        for i, ann in enumerate(history):
+            # Format date
+            dt = datetime.fromisoformat(ann["timestamp"])
+            date_str = dt.strftime("%b %d, %Y")
+            options.append(discord.SelectOption(
+                label=f"{ann['title'][:50]}",
+                description=f"Version: {ann['version']} — {date_str}",
+                value=str(i),
+                emoji="🚀"
+            ))
+        super().__init__(placeholder="Choose an update to view...", options=options)
+        self.history = history
+
+    async def callback(self, interaction: discord.Interaction):
+        ann = self.history[int(self.values[0])]
+        
+        # Reconstruct embed
+        formatted_changes = "\n".join([f"> {line}" for line in ann["changes"].split("\n") if line.strip()])
+        embed = discord.Embed(
+            title=f"◈ {ann['title']}",
+            description=(
+                f"*Nueva versión:* `{ann['version']}`\n\n"
+                f"{formatted_changes}"
+            ),
+            color=0x00FFBB,
+            timestamp=datetime.fromisoformat(ann["timestamp"])
+        )
+        embed.set_image(url=UPDATE_BANNER_URL)
+        from config import OFFICIAL_SERVER_URL
+        embed.add_field(
+            name="🔗 Enlaces rápidos", 
+            value=f"**[Comunidad oficial]({OFFICIAL_SERVER_URL})** | **[Invitación de bot](https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=8&scope=bot%20applications.commands)**",
+            inline=False
+        )
+        embed.set_thumbnail(url=BOT_AVATAR_URL)
+        embed.set_footer(text=ann["footer"], icon_url=BOT_AVATAR_URL)
+        
+        await interaction.response.edit_message(embed=embed, view=None)
+
+class UpdatesHistoryView(discord.ui.View):
+    def __init__(self, history: list[dict]):
+        super().__init__(timeout=120)
+        self.add_item(UpdatesHistorySelect(history))
 
 @bot.tree.command(name="status", description="Advanced system diagnostics (Owner only).")
 @is_owner()

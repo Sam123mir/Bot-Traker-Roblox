@@ -18,6 +18,7 @@ HISTORY_MAX      = 25     # Máximo de entradas en dropdown de Discord
 # ── Almacenamiento ────────────────────────────────────────────
 VERSIONS_FILE  = _os.path.join(_BASE, "data", "versions.json")
 GUILDS_FILE    = _os.path.join(_BASE, "data", "guilds.json")
+ANNOUNCEMENTS_FILE = _os.path.join(_BASE, "data", "announcements.json")
 LOG_FILE       = _os.path.join(_BASE, "logs", "monitor.log")
 
 # ... (Plataformas se mantienen igual)
@@ -57,5 +58,5 @@ BOT_NAME       = "BloxPulse · Roblox Monitor"
 BOT_AVATAR_URL = "https://cdn-icons-png.flaticon.com/512/8157/8157523.png"
 ROBLOX_ICON    = "https://cdn-icons-png.flaticon.com/512/18868/18868601.png"
 ROBLOX_URL     = "https://www.roblox.com"
-OFFICIAL_SERVER_URL = "https://discord.gg/REPLACE_ME" # Placeholder for user's community server
+OFFICIAL_SERVER_URL = "https://discord.gg/7XU8YbDC" # Placeholder for user's community server
 UPDATE_BANNER_URL   = "https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExNXpoZTZ4ZXg2NjFra3hqa3BwMHY4Mm5pemY0Mms3eTU4ZzRtNjd0NiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/7qJWn3LsiSe2WoOABJ/giphy.gif"
