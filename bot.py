@@ -70,8 +70,9 @@ class BloxPulseBot(commands.Bot):
         logger.info("BloxPulse: Bot configured and slash commands synchronized.")
         # Ensure data dir exists
         _os.makedirs("data", exist_ok=True)
-        self.monitor_task.start() # Changed from self.loop.create_task(self.check_loop())
-        await self.tree.sync()
+        self.monitor_task.start()
+        # Background sync to avoid blocking the first few interactions
+        asyncio.create_task(self.tree.sync())
 
     async def on_ready(self):
         logger.info(f"BloxPulse: Connected as {self.user} (ID: {self.user.id})")
@@ -291,10 +292,16 @@ async def premium_response(
         "Professional Monitoring ◈ BloxPulse"
     ]
     embed.set_footer(text=f"{random.choice(footers)}", icon_url=BOT_AVATAR_URL)
-    if interaction.response.is_done():
-        await interaction.followup.send(embed=embed, ephemeral=ephemeral)
-    else:
-        await interaction.response.send_message(embed=embed, ephemeral=ephemeral)
+    try:
+        if interaction.response.is_done():
+            return await interaction.followup.send(embed=embed, ephemeral=ephemeral)
+        else:
+            return await interaction.response.send_message(embed=embed, ephemeral=ephemeral)
+    except discord.errors.NotFound:
+        # Interaction expired or invalid
+        logger.warning(f"Could not send premium response to {interaction.user}: Interaction already expired.")
+    except Exception as e:
+        logger.error(f"Error in premium_response: {e}")
 
 
 def is_owner():
@@ -836,9 +843,14 @@ async def invite(interaction: discord.Interaction):
 @app_commands.checks.has_permissions(manage_channels=True, manage_roles=True)
 async def setup_server(interaction: discord.Interaction):
     """Automatically creates a professional server layout for BloxPulse."""
-    await interaction.response.defer(ephemeral=True)
     guild = interaction.guild
     lang = get_guild_config(guild.id).get("language", "en")
+    
+    try:
+        await interaction.response.defer(ephemeral=True)
+    except Exception as e:
+        logger.error(f"Initial defer failed for setup_server: {e}")
+        return
 
     # Categories and Channels structure
     structure = {
