@@ -14,6 +14,7 @@ from discord.ext import commands, tasks
 from datetime import datetime, timezone
 from typing import Optional
 import threading
+import math as _math
 from flask import Flask
 from dotenv import load_dotenv
 
@@ -885,11 +886,20 @@ app = Flask(__name__)
 def home():
     uptime = time.time() - bot.start_time
     h, m, s = int(uptime // 3600), int((uptime % 3600) // 60), int(uptime % 60)
+    
+    # Manejar caso de latencia NaN antes de la conexión inicial
+    latency = "Connecting..."
+    try:
+        if not _math.isnan(bot.latency):
+            latency = f"{round(bot.latency * 1000)}ms"
+    except:
+        pass
+
     return {
         "status": "online",
         "bot": "X-Blaze v1.4",
         "uptime": f"{h}h {m}m {s}s",
-        "latency": f"{round(bot.latency * 1000)}ms",
+        "latency": latency,
         "guilds": len(bot.guilds)
     }
 
