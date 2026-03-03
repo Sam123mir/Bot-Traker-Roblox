@@ -165,27 +165,22 @@ bot = BloxPulseBot()
 class AnnouncementModal(discord.ui.Modal, title='🚀 Create BloxPulse Update'):
     ann_title = discord.ui.TextInput(
         label='Update Title',
-        placeholder='e.g., BloxPulse v1.5: Final Rebranding',
+        placeholder='e.g., BloxPulse v1.7: Premium Preview Stage',
         required=True,
         max_length=100
     )
     version = discord.ui.TextInput(
         label='Version Number',
-        placeholder='e.g., v1.5.0',
+        placeholder='e.g., v1.7.0',
         required=True,
         max_length=20
     )
     changes = discord.ui.TextInput(
         label='What\'s New?',
-        placeholder='• Rebranded to BloxPulse\n• Added /donate command\n• Fixed mobile detection...',
+        placeholder='• Added live preview to broadcast\n• Improved visual layout\n• Stable monitoring system...',
         style=discord.TextStyle.paragraph,
         required=True,
         max_length=2000
-    )
-    image_url = discord.ui.TextInput(
-        label='Image URL (Optional)',
-        placeholder='https://example.com/image.png',
-        required=False
     )
     footer = discord.ui.TextInput(
         label='Custom Footer (Optional)',
@@ -195,11 +190,9 @@ class AnnouncementModal(discord.ui.Modal, title='🚀 Create BloxPulse Update'):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-        
-        # Build the premium announcement embed
+        # Build the preview embed
         embed = discord.Embed(
-            title=f"� BloxPulse Update: {self.ann_title.value}",
+            title=f"◈ BloxPulse Update: {self.ann_title.value}",
             description=(
                 f"**New Version**: `{self.version.value}`\n\n"
                 f"{self.changes.value}\n\n"
@@ -208,11 +201,7 @@ class AnnouncementModal(discord.ui.Modal, title='🚀 Create BloxPulse Update'):
             color=0x00FFBB,
             timestamp=datetime.now(timezone.utc)
         )
-        if self.image_url.value:
-            embed.set_image(url=self.image_url.value)
-        else:
-            # Use the official update banner GIF by default
-            embed.set_image(url=UPDATE_BANNER_URL)
+        embed.set_image(url=UPDATE_BANNER_URL)
         
         from config import OFFICIAL_SERVER_URL
         embed.add_field(
@@ -224,18 +213,43 @@ class AnnouncementModal(discord.ui.Modal, title='🚀 Create BloxPulse Update'):
         embed.set_thumbnail(url=BOT_AVATAR_URL)
         embed.set_footer(
             text=self.footer.value or "BloxPulse · The standard for Roblox Monitoring",
-            icon_url=bot.user.avatar.url if bot.user.avatar else BOT_AVATAR_URL
+            icon_url=BOT_AVATAR_URL
         )
 
+        # Show the preview view
+        view = AnnouncementReviewView(embed)
+        await interaction.response.send_message(
+            content="🔍 **Live Preview**: This is how the update will look. Check for typos!",
+            embed=embed, 
+            view=view, 
+            ephemeral=True
+        )
+
+
+class AnnouncementReviewView(discord.ui.View):
+    """Stage 2: Confirm or Cancel the broadcast."""
+    def __init__(self, embed: discord.Embed):
+        super().__init__(timeout=300)
+        self.embed = embed
+
+    @discord.ui.button(label="🚀 Send Broadcast", style=discord.ButtonStyle.success, emoji="🌍")
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True)
+        
         channels = get_all_announcement_channels()
         count = 0
         failed = 0
+
+        # Disable buttons while sending
+        for item in self.children:
+            item.disabled = True
+        await interaction.edit_original_response(view=self)
 
         for channel_id in channels:
             channel = bot.get_channel(channel_id)
             if channel:
                 try:
-                    await channel.send(embed=embed)
+                    await channel.send(embed=self.embed)
                     count += 1
                 except:
                     failed += 1
@@ -244,6 +258,15 @@ class AnnouncementModal(discord.ui.Modal, title='🚀 Create BloxPulse Update'):
             f"✅ **Broadcast Complete!**\nSent to `{count}` servers.\nFailed in `{failed}` servers.",
             ephemeral=True
         )
+        self.stop()
+
+    @discord.ui.button(label="🗑️ Cancel", style=discord.ButtonStyle.danger, emoji="❌")
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("❌ Broadcast cancelled. Nothing was sent.", ephemeral=True)
+        for item in self.children:
+            item.disabled = True
+        await interaction.edit_original_response(view=self)
+        self.stop()
 
 # ═══════════════════════════════════════════════════════════════
 # ── DONATION VIEW ────────────────────────────────────────────
