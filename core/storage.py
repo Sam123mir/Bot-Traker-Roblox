@@ -28,6 +28,9 @@ def _load_json(path: str) -> dict:
         return {}
 
 def _save_json(path: str, data: dict) -> bool:
+    # Asegurar que el directorio existe
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    
     tmp = path + ".tmp"
     try:
         with open(tmp, "w", encoding="utf-8") as fh:
