@@ -13,6 +13,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 from datetime import datetime, timezone
 from typing import Optional
+import random
 import threading
 import math as _math
 from flask import Flask
@@ -86,18 +87,19 @@ class BloxPulseBot(commands.Bot):
         target = guild.system_channel or next((c for c in guild.text_channels if c.permissions_for(guild.me).send_messages), None)
         if target:
             embed = discord.Embed(
-                title="👋 ¡Gracias por elegir BloxPulse!",
+                title="✨ ¡Gracias por invitar a BloxPulse!",
                 description=(
-                    "Soy tu monitor profesional de versiones de Roblox.\n\n"
-                    "**Próximos pasos recomendados:**\n"
-                    "1️⃣ Usa `/setup announcements` para elegir un canal donde recibirás noticias mías.\n"
-                    "2️⃣ Usa `/config channel` para configurar el canal de alertas de versiones.\n"
-                    "3️⃣ Usa `/check` para ver las versiones actuales.\n\n"
-                    "¡Es un placer estar aquí!"
+                    "Estoy listo para monitorear las versiones de Roblox por ti.\n\n"
+                    "**Configura el bot ahora:**\n"
+                    "🔹 **Alertas de Roblox**: `/setup alerts` (Recomendado)\n"
+                    "🔹 **Noticias de BloxPulse**: `/setup announcements` (Opcional)\n\n"
+                    "Usa `/help` para ver la lista completa de comandos."
                 ),
-                color=0x00FFBB
+                color=0x00FFBB,
+                timestamp=datetime.now(timezone.utc)
             )
-            embed.set_footer(text="BloxPulse Global Monitor", icon_url=self.user.avatar.url if self.user.avatar else None)
+            embed.set_thumbnail(url=BOT_AVATAR_URL)
+            embed.set_footer(text="BloxPulse · Monitoring System", icon_url=BOT_AVATAR_URL)
             try: await target.send(embed=embed)
             except: pass
 
@@ -247,9 +249,10 @@ async def premium_response(
     thumbnail: str = None,
 ):
     """Send a consistent, branded embed response."""
+    desc = description
     embed = discord.Embed(
         title=f"◈ {title}",
-        description=description,
+        description=desc,
         color=color,
         timestamp=datetime.now(timezone.utc),
     )
@@ -258,7 +261,15 @@ async def premium_response(
             embed.add_field(name=f[0], value=f[1], inline=f[2] if len(f) > 2 else True)
     if thumbnail:
         embed.set_thumbnail(url=thumbnail)
-    embed.set_footer(text="BloxPulse Monitor", icon_url=BOT_AVATAR_URL)
+    
+    footers = [
+        "BloxPulse Monitor 📡",
+        "Global Roblox Tracker 🌍",
+        "Monitoring with Pulse 🟢",
+        "Stay updated, stay fast 🚀",
+        "Professional Monitoring ◈ BloxPulse"
+    ]
+    embed.set_footer(text=f"{random.choice(footers)}", icon_url=BOT_AVATAR_URL)
     if interaction.response.is_done():
         await interaction.followup.send(embed=embed, ephemeral=ephemeral)
     else:
@@ -431,7 +442,7 @@ class ComparePrevSelect(discord.ui.Select):
             inline=True,
         )
         embed.set_thumbnail(url=plat.get("icon_url", BOT_AVATAR_URL))
-        embed.set_footer(text="BloxPulse Monitor", icon_url=BOT_AVATAR_URL)
+        embed.set_footer(text=f"{random.choice(['BloxPulse Monitor', 'Global BloxPulse', 'Global Roblox Monitoring State'])}", icon_url=BOT_AVATAR_URL)
         await interaction.response.edit_message(embed=embed)
 
 
@@ -706,20 +717,44 @@ async def ping_cmd(interaction: discord.Interaction):
     uptime = time.time() - bot.start_time
     h, m, s = int(uptime // 3600), int((uptime % 3600) // 60), int(uptime % 60)
 
+    def get_bar(ms):
+        if ms < 0: return "⬛⬛⬛⬛⬛"
+        filled = min(5, max(1, 5 - int(ms / 150)))
+        return "🟩" * filled + "⬜" * (5 - filled)
+
     embed = discord.Embed(
-        title="◈ BloxPulse · Network Status",
-        description="Real-time latency and connectivity diagnostics.\n\u200b",
+        title="◈ BloxPulse · Red & Latencia",
+        description="Estado detallado de la conexión con Discord y APIs.\n\u200b",
         color=0x2ECC71 if (ws_latency < 200 and roblox_ok) else 0xE67E22,
         timestamp=datetime.now(timezone.utc),
     )
-    embed.add_field(name=f"{ws_indicator} Discord WebSocket", value=f"`{ws_latency} ms`",                          inline=True)
-    embed.add_field(name=f"{rbl_indicator} Roblox API",       value=f"`{http_ms if http_ms >= 0 else 'Timeout'} ms`", inline=True)
-    embed.add_field(name="⏱️ Uptime",                         value=f"`{h}h {m}m {s}s`",                           inline=True)
-    embed.add_field(name="🤖 Bot",                            value=f"`BloxPulse v1.4`",                              inline=True)
-    embed.add_field(name="📡 Roblox API",                     value="`Online`" if roblox_ok else "`Unreachable`",   inline=True)
-    embed.add_field(name="🔁 Check Interval",                 value=f"`{CHECK_INTERVAL}s`",                         inline=True)
-    embed.set_footer(text="BloxPulse Monitor", icon_url=BOT_AVATAR_URL)
+    embed.add_field(name=f"{ws_indicator} Latencia Discord", value=f"`{ws_latency} ms` {get_bar(ws_latency)}", inline=True)
+    embed.add_field(name=f"{rbl_indicator} API Roblox",    value=f"`{http_ms if http_ms >= 0 else 'Timeout'} ms` {get_bar(http_ms)}", inline=True)
+    embed.add_field(name="⏱️ Tiempo Activo",               value=f"`{h}h {m}m {s}s`", inline=True)
+    embed.add_field(name="🔁 Ciclo de Monitoreo",          value=f"`{CHECK_INTERVAL}s`", inline=True)
+    
+    embed.set_footer(text=f"BloxPulse v1.5 · {random.choice(['Estable', 'Operativo', 'Online'])}", icon_url=BOT_AVATAR_URL)
     await interaction.followup.send(embed=embed, ephemeral=True)
+
+
+@bot.tree.command(name="info", description="ℹ️ Learn more about BloxPulse and its developers.")
+async def info_cmd(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="◈ BloxPulse Project",
+        description=(
+            "**BloxPulse** es un sistema de monitoreo global para Roblox, "
+            "diseñado para ofrecer datos precisos y rápidos sobre actualizaciones de plataformas.\n\n"
+            "**👑 Owner/Dev:** <@1420085090570207313>\n"
+            "**🛠️ Tech Stack:** Python, discord.py, Flask, Docker.\n"
+            "**🌎 Alcance:** Global (Windows, Mac, Android, iOS).\n\n"
+            "Si te gusta el proyecto, considera usar `/donate` para apoyarnos."
+        ),
+        color=0x5865F2,
+        timestamp=datetime.now(timezone.utc)
+    )
+    embed.set_thumbnail(url=BOT_AVATAR_URL)
+    embed.set_image(url="https://images-ext-1.discordapp.net/external/E-hF_N79Uv0z_Jj_UoX4B2j7j0J6Y3tF6e7f_n7_j0/https/media.giphy.com/media/v1.Y2lkPTc5MGI3NjExM2I1YzM0ZGQzYjU0Y2EyZTM1ZTM1ZTM1ZTM1ZTM1ZTM1ZTM1ZTM1JmVwPXYxX2ludGVybmFsX2dpZl9ieV9pZCZjdD1n/3o7TKMGpxS7tHjN0_y/giphy.gif") # Nice aesthetic pulse gif
+    await interaction.response.send_message(embed=embed)
 
 
 @bot.tree.command(name="platforms", description="List all monitored platforms and their status.")
@@ -739,8 +774,8 @@ async def platforms(interaction: discord.Interaction):
             value=f"```\n{display}```",
             inline=True,
         )
-    embed.set_footer(text="BloxPulse Monitor", icon_url=BOT_AVATAR_URL)
-    await interaction.response.send_message(embed=embed)
+    embed.set_footer(text="BloxPulse · Monitoring Node: US-West", icon_url=BOT_AVATAR_URL)
+    await interaction.followup.send(embed=embed)
 
 
 @bot.tree.command(name="myid", description="Display your Discord user ID.")
@@ -771,6 +806,7 @@ async def help_cmd(interaction: discord.Interaction):
             "`/platforms` — All tracked platforms\n"
             "`/ping` — Bot & API latency\n"
             "`/donate` — Support BloxPulse development 💖\n"
+            "`/info` — Project details & credits ℹ️\n"
             "`/myid` — Your Discord ID\n"
             "`/help` — This menu"
         ),
@@ -779,7 +815,7 @@ async def help_cmd(interaction: discord.Interaction):
     embed.add_field(
         name="🛡️ Admin Commands (Manage Server)",
         value=(
-            "`/setup` — Configure alert channel & role\n"
+            "`/setup alerts` — Configure alert channel & role\n"
             "`/setup announcements` — Configure news channel\n"
             "`/language` — Set server language\n"
             "`/config` — View current server config"
