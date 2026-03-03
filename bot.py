@@ -112,15 +112,21 @@ class BloxPulseBot(commands.Bot):
             # fetch_all now returns a dict of {key: VersionCheckResult}
             results = await loop.run_in_executor(None, fetch_all)
 
-            for key, result in results.items():
-                if not result:
+            for key, vi in results.items():
+                if not vi:
                     continue # Skip if no data was fetched for this platform
 
-                if result.get("changed"):
-                    vi = result["new_version_info"]
+                state = get_version_data(key)
+                old_hash = state.get("current", "")
+
+                if old_hash and old_hash != vi.version_hash:
                     logger.info(f"BloxPulse: Change detected for {key} -> {vi.version_hash}")
                     update_version(key, vi.version_hash) # Update the stored version
-                    await self.broadcast_update(key, vi, result["old_version_hash"])
+                    await self.broadcast_update(key, vi, old_hash)
+                elif not old_hash:
+                    # Initial run: store but don't broadcast
+                    logger.info(f"BloxPulse: Initializing data for {key} -> {vi.version_hash}")
+                    update_version(key, vi.version_hash)
                 else:
                     logger.debug(f"BloxPulse: No change for {key}")
 
