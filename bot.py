@@ -217,7 +217,7 @@ class AnnouncementModal(discord.ui.Modal, title='🚀 Create BloxPulse Update'):
         from config import OFFICIAL_SERVER_URL
         embed.add_field(
             name="🔗 Quick Links", 
-            value=f"[Official Community]({OFFICIAL_SERVER_URL}) • [Bot Invite](https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=2147566592&scope=bot%20applications.commands)",
+            value=f"[Official Community]({OFFICIAL_SERVER_URL}) • [Bot Invite](https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=8&scope=bot%20applications.commands)",
             inline=False
         )
         
@@ -817,7 +817,7 @@ async def myid(interaction: discord.Interaction):
 @bot.tree.command(name="invite", description="🚀 Get the link to add BloxPulse to your server.")
 async def invite(interaction: discord.Interaction):
     lang = get_guild_config(interaction.guild_id).get("language", "en")
-    invite_url = f"https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=2147566592&scope=bot%20applications.commands"
+    invite_url = f"https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=8&scope=bot%20applications.commands"
     
     embed = discord.Embed(
         title=get_text(lang, "invite_title"),

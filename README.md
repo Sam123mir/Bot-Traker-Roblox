@@ -1,4 +1,4 @@
-# X-Blaze | Roblox Version Monitor
+# BloxPulse — Roblox Version Monitor
 
 Monitor de versiones de Roblox profesional con historial, comparativas y notificaciones multilingües.
 

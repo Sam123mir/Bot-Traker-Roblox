@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # ============================================================
-#   X-Blaze | Roblox Version Monitor — monitor.py
+#   BloxPulse | Roblox Version Monitor — monitor.py
 #   Bucle principal 24/7 de detección de cambios.
 #
 #   Uso:
@@ -88,7 +88,7 @@ def _check_cycle(stored: dict) -> dict:
 def main() -> None:
     _setup_logging()
     logger.info("=" * 60)
-    logger.info("  X-Blaze · Roblox Version Monitor — Iniciando")
+    logger.info("  BloxPulse · Roblox Version Monitor — Iniciando")
     logger.info("  Intervalo de chequeo: %ds | Plataformas: %s",
                 config.CHECK_INTERVAL, list(config.PLATFORMS.keys()))
     logger.info("=" * 60)
