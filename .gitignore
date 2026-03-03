@@ -1,0 +1,20 @@
+# X-Blaze — .gitignore
+__pycache__/
+*.pyc
+*.pyo
+
+# Logs (no subir al repo)
+logs/
+
+# Datos locales (se regeneran sólo en producción)
+data/
+
+# Archivos temporales
+tmp_*.py
+tmp_*.txt
+out.txt
+
+# Env
+.env
+*.env
+python-dotenv
