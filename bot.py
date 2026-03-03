@@ -99,8 +99,9 @@ class BloxPulseBot(commands.Bot):
                 color=0x00FFBB,
                 timestamp=datetime.now(timezone.utc)
             )
-            embed.set_thumbnail(url=BOT_AVATAR_URL)
-            embed.set_footer(text="BloxPulse · Monitoring System", icon_url=BOT_AVATAR_URL)
+            avatar_url = self.user.display_avatar.url if self.user else BOT_AVATAR_URL
+            embed.set_thumbnail(url=avatar_url)
+            embed.set_footer(text="BloxPulse · Monitoring System", icon_url=avatar_url)
             try: await target.send(embed=embed)
             except: pass
 
@@ -148,7 +149,8 @@ class BloxPulseBot(commands.Bot):
             lang    = config.get("language", "en")
             role_id = config.get("ping_role_id")
             mention = f"<@&{role_id}>" if role_id else None
-            embed   = build_update_embed(platform_key, vi, prev_hash, lang)
+            avatar_url = self.user.display_avatar.url if self.user else BOT_AVATAR_URL
+            embed   = build_update_embed(platform_key, vi, prev_hash, lang, bot_icon=avatar_url)
             view    = create_language_view(platform_key, vi, prev_hash, lang)
 
             try:
@@ -368,7 +370,8 @@ async def premium_response(
         "Stay updated, stay fast 🚀",
         "Professional Monitoring ◈ BloxPulse"
     ]
-    embed.set_footer(text=f"{random.choice(footers)}", icon_url=BOT_AVATAR_URL)
+    avatar_url = bot.user.display_avatar.url if bot.user else BOT_AVATAR_URL
+    embed.set_footer(text=f"{random.choice(footers)}", icon_url=avatar_url)
     try:
         if interaction.response.is_done():
             return await interaction.followup.send(embed=embed, ephemeral=ephemeral)
@@ -455,8 +458,9 @@ class VersionHistorySelect(discord.ui.Select):
         embed.add_field(name="📅 Deployed",     value=ts_discord,               inline=False)
         if rdd_url:
             embed.add_field(name="⬇️ Download",  value=f"[◈ Download via RDD]({rdd_url})", inline=False)
-        embed.set_thumbnail(url=plat.get("icon_url", BOT_AVATAR_URL))
-        embed.set_footer(text="BloxPulse Monitor", icon_url=BOT_AVATAR_URL)
+        avatar_url = bot.user.display_avatar.url if bot.user else BOT_AVATAR_URL
+        embed.set_thumbnail(url=plat.get("icon_url", avatar_url))
+        embed.set_footer(text="BloxPulse Monitor", icon_url=avatar_url)
         await interaction.response.edit_message(embed=embed)
 
 
@@ -1005,7 +1009,7 @@ async def help_cmd(interaction: discord.Interaction):
         ),
         inline=False,
     )
-    embed.set_footer(text="BloxPulse Global Monitor", icon_url=BOT_AVATAR_URL)
+    embed.set_footer(text="BloxPulse Global Monitor", icon_url=bot.user.display_avatar.url)
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
@@ -1123,7 +1127,7 @@ class UpdatesHistorySelect(discord.ui.Select):
 
 class UpdatesHistoryView(discord.ui.View):
     def __init__(self, history: list[dict]):
-        super().__init__(timeout=120)
+        super().__init__(timeout=None)
         self.add_item(UpdatesHistorySelect(history))
 
 @bot.tree.command(name="status", description="Advanced system diagnostics (Owner only).")
@@ -1136,7 +1140,7 @@ async def status(interaction: discord.Interaction):
         ("⏱️ Uptime",   f"`{h}h {m}m {s}s`",                 True),
         ("🏠 Guilds",   f"`{len(bot.guilds)} servers`",        True),
         ("📶 Latency",  f"`{round(bot.latency * 1000)}ms`",    True),
-        ("🤖 Version",  "`BloxPulse v1.5 · Global`",            True),
+        ("🤖 Version",  "`BloxPulse v1.7 · Premium`",           True),
         ("🔁 Interval", f"`{CHECK_INTERVAL}s cycles`",         True),
         ("👑 Owner",    f"`{interaction.user.id}`",             True),
     ]
@@ -1186,7 +1190,8 @@ async def donate(interaction: discord.Interaction):
         timestamp=datetime.now(timezone.utc)
     )
     embed.set_thumbnail(url="https://cdn-icons-png.flaticon.com/512/174/174861.png")
-    embed.set_footer(text="Gracias por tu apoyo ❤️", icon_url=interaction.user.avatar.url if interaction.user.avatar else None)
+    avatar_url = bot.user.display_avatar.url if bot.user else None
+    embed.set_footer(text="Gracias por tu apoyo ❤️", icon_url=avatar_url)
     
     view = DonationView()
     await interaction.response.send_message(embed=embed, view=view)
@@ -1228,7 +1233,7 @@ async def test(interaction: discord.Interaction, platform: str):
                     title="◈ No Version Data",
                     description=f"No stored or live version found for **{PLATFORMS[platform]['label']}**.\nTry `/check` first.",
                     color=0xE74C3C, timestamp=datetime.now(timezone.utc)
-                ).set_footer(text="BloxPulse Monitor", icon_url=BOT_AVATAR_URL),
+                ).set_footer(text="BloxPulse Monitor", icon_url=bot.user.display_avatar.url),
                 ephemeral=True
             )
             return
@@ -1245,7 +1250,7 @@ async def test(interaction: discord.Interaction, platform: str):
             title="◈ Preview Sent",
             description=f"Embed sent for **{PLATFORMS[platform]['label']}**\nHash: `{vi.version_hash}`",
             color=0x27AE60, timestamp=datetime.now(timezone.utc)
-        ).set_footer(text="BloxPulse Monitor", icon_url=BOT_AVATAR_URL),
+        ).set_footer(text="BloxPulse Monitor", icon_url=bot.user.display_avatar.url),
         ephemeral=True
     )
 
@@ -1264,7 +1269,7 @@ async def reload(interaction: discord.Interaction):
                 description=f"✅ Fetched data for: `{platform_list}`\nAll changes will be broadcast if detected.",
                 color=0x27AE60,
                 timestamp=datetime.now(timezone.utc),
-            ).set_footer(text="BloxPulse Monitor", icon_url=BOT_AVATAR_URL),
+            ).set_footer(text="BloxPulse Monitor", icon_url=bot.user.display_avatar.url),
             ephemeral=True,
         )
     except Exception as e:

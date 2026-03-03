@@ -1,5 +1,5 @@
 # ============================================================
-#   X-Blaze | Roblox Version Monitor — core/checker.py
+#   BloxPulse | Roblox Version Monitor — core/checker.py
 #   Fetches versions from all supported platforms.
 # ============================================================
 

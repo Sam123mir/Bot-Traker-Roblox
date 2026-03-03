@@ -41,6 +41,7 @@ def build_update_embed(
     prev_hash: Optional[str],
     lang: str = "en",
     selected_hash: Optional[str] = None,  # None = show current vi
+    bot_icon: Optional[str] = None
 ) -> discord.Embed:
     cfg   = PLATFORMS[platform_key]
     label = cfg["label"]
@@ -114,19 +115,20 @@ def build_update_embed(
     )
     embed.set_footer(
         text=f"BloxPulse · Monitoring System | {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC",
-        icon_url=BOT_AVATAR_URL,
+        icon_url=bot_icon or BOT_AVATAR_URL,
     )
     return embed
 
 # ── Dropdown: Language Selector ───────────────────────────────
 
 class LanguageSelector(Select):
-    def __init__(self, platform_key: str, vi: VersionInfo, prev_hash: str, lang: str, selected_hash: Optional[str] = None):
+    def __init__(self, platform_key: str, vi: VersionInfo, prev_hash: str, lang: str, selected_hash: Optional[str] = None, bot_icon: Optional[str] = None):
         self.platform_key  = platform_key
         self.vi            = vi
         self.prev_hash     = prev_hash
         self.current_lang  = lang
         self.selected_hash = selected_hash
+        self.bot_icon      = bot_icon
 
         options = [
             discord.SelectOption(label="English",   value="en"),
@@ -139,19 +141,20 @@ class LanguageSelector(Select):
 
     async def callback(self, interaction: discord.Interaction):
         new_lang = self.values[0]
-        embed    = build_update_embed(self.platform_key, self.vi, self.prev_hash, new_lang, self.selected_hash)
-        view     = create_language_view(self.platform_key, self.vi, self.prev_hash, new_lang, self.selected_hash)
+        embed    = build_update_embed(self.platform_key, self.vi, self.prev_hash, new_lang, self.selected_hash, bot_icon=self.bot_icon)
+        view     = create_language_view(self.platform_key, self.vi, self.prev_hash, new_lang, self.selected_hash, bot_icon=self.bot_icon)
         await interaction.response.edit_message(embed=embed, view=view)
 
 # ── Dropdown: Version History Selector ───────────────────────
 
 class VersionHistorySelector(Select):
-    def __init__(self, platform_key: str, vi: VersionInfo, prev_hash: str, lang: str, selected_hash: Optional[str] = None):
+    def __init__(self, platform_key: str, vi: VersionInfo, prev_hash: str, lang: str, selected_hash: Optional[str] = None, bot_icon: Optional[str] = None):
         self.platform_key  = platform_key
         self.vi            = vi
         self.prev_hash     = prev_hash
         self.lang          = lang
         self.selected_hash = selected_hash
+        self.bot_icon      = bot_icon
 
         state      = get_version_data(platform_key)
         history    = state.get("history", [])
@@ -202,8 +205,8 @@ class VersionHistorySelector(Select):
             return
 
         new_sel = None if val == "__current__" else val
-        embed   = build_update_embed(self.platform_key, self.vi, self.prev_hash, self.lang, new_sel)
-        view    = create_language_view(self.platform_key, self.vi, self.prev_hash, self.lang, new_sel)
+        embed   = build_update_embed(self.platform_key, self.vi, self.prev_hash, self.lang, new_sel, bot_icon=self.bot_icon)
+        view    = create_language_view(self.platform_key, self.vi, self.prev_hash, self.lang, new_sel, bot_icon=self.bot_icon)
         await interaction.response.edit_message(embed=embed, view=view)
 
 # ── View Factory ──────────────────────────────────────────────
@@ -214,9 +217,10 @@ def create_language_view(
     prev_hash: str,
     current_lang: str = "en",
     selected_hash: Optional[str] = None,
+    bot_icon: Optional[str] = None,
 ) -> View:
     """Creates the dual-dropdown View (Language + Version History)."""
     view = View(timeout=None)
-    view.add_item(LanguageSelector(platform_key, vi, prev_hash, current_lang, selected_hash))
-    view.add_item(VersionHistorySelector(platform_key, vi, prev_hash, current_lang, selected_hash))
+    view.add_item(LanguageSelector(platform_key, vi, prev_hash, current_lang, selected_hash, bot_icon=bot_icon))
+    view.add_item(VersionHistorySelector(platform_key, vi, prev_hash, current_lang, selected_hash, bot_icon=bot_icon))
     return view
