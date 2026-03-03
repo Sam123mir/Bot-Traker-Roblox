@@ -2,28 +2,27 @@
 
 Monitor de versiones de Roblox profesional con historial, comparativas y notificaciones multilingües.
 
-## 🚀 Despliegue: GitHub + Webhost + UptimeRobot (24/7 Gratis)
+## 🚀 Despliegue: Northflank + UptimeRobot (Recomendado)
 
-Esta es la mejor forma de mantener el bot siempre online sin tarjeta y sin costos.
+Northflank es una excelente opción profesional para el bot.
 
 ### 1. Preparación en GitHub
-1. Crea un repositorio en **GitHub** (puede ser privado).
-2. Sube todos los archivos (el bot ahora incluye un servidor **Flask** interno).
-    - *Nota: El `.gitignore` evitará que subas archivos pesados o privados.*
+1. Asegúrate de que tu código esté en tu repositorio: `https://github.com/Sam123mir/Bot-Traker-Roblox.git`.
+2. He incluido un **Dockerfile** para que Northflank lo detecte automáticamente.
 
-### 2. Elegir Webhost (Render o similar)
-1. Conecta tu repositorio a un servicio como **Render**, **Koyeb** o **Railway**.
-2. **Build Command**: `pip install -r requirements.txt`
-3. **Start Command**: `python bot.py` (o `gunicorn bot:app` si usas un web-worker puro).
-4. El bot levantará una web en el puerto `8080`.
+### 2. Configuración en Northflank
+1. Crea un **New Service** -> **Combined Service**.
+2. **Repository**: Conecta tu repositorio de GitHub.
+3. **Build Settings**: Northflank detectará el `Dockerfile`.
+4. **Environment Variables**:
+    - `DISCORD_BOT_TOKEN`: Tu token de Discord.
+    - `PORT`: 8080
+5. **Port Settings**: Expón el puerto `8080` (HTTP).
+6. **Health Check**: Configura un Health Check HTTP a la ruta `/` en el puerto `8080`.
 
-### 3. Configurar UptimeRobot (El truco 24/7)
-1. Crea una cuenta en [UptimeRobot.com](https://uptimerobot.com/).
-2. Añade un **New Monitor**:
-    - **Monitor Type**: HTTP(s)
-    - **URL**: La URL que te dio tu Webhost (ej: `https://tu-bot.onrender.com`).
-    - **Interval**: Cada 5 minutos.
-3. Esto enviará una señal a Flask cada 5 minutos, impidiendo que el servidor "se duerma".
+### 3. Mantener vivo con UptimeRobot
+1. Una vez desplegado, Northflank te dará una URL (ej: `https://tu-servicio.code.run`).
+2. Configura esa URL en [UptimeRobot.com](https://uptimerobot.com/) para que haga ping cada 5 minutos. Esto evitará que la instancia entre en suspensión en planes gratuitos.
 
 ## 🛠️ Comandos
 
