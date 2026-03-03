@@ -243,6 +243,32 @@ class AnnouncementModal(discord.ui.Modal, title='🚀 Create BloxPulse Update'):
         )
 
 
+def build_announcement_embed(ann_data: dict) -> discord.Embed:
+    """Helper to maintain a consistent style across broadcast and history."""
+    formatted_changes = "\n".join([f"> {line}" for line in ann_data["changes"].split("\n") if line.strip()])
+    
+    embed = discord.Embed(
+        title=f"◈ {ann_data['title']}",
+        description=(
+            f"*Nueva versión:* `{ann_data['version']}`\n\n"
+            f"{formatted_changes}"
+        ),
+        color=0x00FFBB,
+        timestamp=datetime.fromisoformat(ann_data["timestamp"])
+    )
+    embed.set_image(url=UPDATE_BANNER_URL)
+    
+    from config import OFFICIAL_SERVER_URL
+    embed.add_field(
+        name="🔗 Enlaces rápidos", 
+        value=f"**[Comunidad oficial]({OFFICIAL_SERVER_URL})** | **[Invitación de bot](https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=8&scope=bot%20applications.commands)**",
+        inline=False
+    )
+    embed.set_thumbnail(url=BOT_AVATAR_URL)
+    embed.set_footer(text=ann_data["footer"], icon_url=BOT_AVATAR_URL)
+    return embed
+
+
 class AnnouncementReviewView(discord.ui.View):
     """Stage 2: Confirm or Cancel the broadcast."""
     def __init__(self, embed: discord.Embed, ann_data: dict):
@@ -1055,15 +1081,22 @@ async def updates_history(interaction: discord.Interaction):
     if not history:
         return await premium_response(interaction, "History Empty", "No announcements have been sent yet.", color=0xE74C3C)
 
+    # Show latest by default with the dropdown
+    latest_embed = build_announcement_embed(history[0])
     view = UpdatesHistoryView(history)
-    await interaction.response.send_message("🔍 **Latest BloxPulse Updates**: Select one to view details.", view=view, ephemeral=True)
+    
+    await interaction.response.send_message(
+        content="🔍 **BloxPulse Update History**",
+        embed=latest_embed,
+        view=view,
+        ephemeral=True
+    )
 
 
 class UpdatesHistorySelect(discord.ui.Select):
     def __init__(self, history: list[dict]):
         options = []
         for i, ann in enumerate(history):
-            # Format date
             dt = datetime.fromisoformat(ann["timestamp"])
             date_str = dt.strftime("%b %d, %Y")
             options.append(discord.SelectOption(
@@ -1072,34 +1105,14 @@ class UpdatesHistorySelect(discord.ui.Select):
                 value=str(i),
                 emoji="🚀"
             ))
-        super().__init__(placeholder="Choose an update to view...", options=options)
+        super().__init__(placeholder="Switch to another update...", options=options)
         self.history = history
 
     async def callback(self, interaction: discord.Interaction):
         ann = self.history[int(self.values[0])]
-        
-        # Reconstruct embed
-        formatted_changes = "\n".join([f"> {line}" for line in ann["changes"].split("\n") if line.strip()])
-        embed = discord.Embed(
-            title=f"◈ {ann['title']}",
-            description=(
-                f"*Nueva versión:* `{ann['version']}`\n\n"
-                f"{formatted_changes}"
-            ),
-            color=0x00FFBB,
-            timestamp=datetime.fromisoformat(ann["timestamp"])
-        )
-        embed.set_image(url=UPDATE_BANNER_URL)
-        from config import OFFICIAL_SERVER_URL
-        embed.add_field(
-            name="🔗 Enlaces rápidos", 
-            value=f"**[Comunidad oficial]({OFFICIAL_SERVER_URL})** | **[Invitación de bot](https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=8&scope=bot%20applications.commands)**",
-            inline=False
-        )
-        embed.set_thumbnail(url=BOT_AVATAR_URL)
-        embed.set_footer(text=ann["footer"], icon_url=BOT_AVATAR_URL)
-        
-        await interaction.response.edit_message(embed=embed, view=None)
+        embed = build_announcement_embed(ann)
+        # Keep the view so they can switch again
+        await interaction.response.edit_message(embed=embed, view=self.view)
 
 class UpdatesHistoryView(discord.ui.View):
     def __init__(self, history: list[dict]):
