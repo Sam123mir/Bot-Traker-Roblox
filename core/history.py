@@ -1,5 +1,5 @@
 # ============================================================
-#   X-Blaze | Roblox Version Monitor — core/history.py
+#   BloxPulse | Roblox Version Monitor — core/history.py
 #   Fetches version history from Roblox's public DeployHistory.txt
 # ============================================================
 
@@ -118,7 +118,10 @@ def fetch_deploy_history(platform_key: str, days: int = HISTORY_DAYS) -> list[di
 
 
 def make_rdd_url(platform_key: str, version_hash: str, channel: str = "LIVE") -> Optional[str]:
-    """Build a direct RDD download URL for Windows or Mac versions."""
+    """
+    Build a direct RDD download URL for Windows or Mac versions.
+    Note: RDD (rdd.latte.to) is a third-party service and may occasionally fail with 403.
+    """
     binary_map = {
         "WindowsPlayer":   "WindowsPlayer",
         "WindowsStudio64": "WindowsStudio64",
@@ -128,4 +131,7 @@ def make_rdd_url(platform_key: str, version_hash: str, channel: str = "LIVE") ->
     bt = binary_map.get(platform_key)
     if not bt:
         return None
-    return f"https://rdd.latte.to/?channel={channel}&binaryType={bt}&version={version_hash}"
+    
+    # Ensure version_hash is clean
+    clean_hash = version_hash.strip()
+    return f"https://rdd.latte.to/?channel={channel}&binaryType={bt}&version={clean_hash}"

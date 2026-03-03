@@ -1,5 +1,5 @@
 # ============================================================
-#   X-Blaze | Roblox Version Monitor — notifier.py
+#   BloxPulse | Roblox Version Monitor — notifier.py
 #   Builds update embeds and interactive dual-dropdown view.
 # ============================================================
 
@@ -113,7 +113,7 @@ def build_update_embed(
         inline=False,
     )
     embed.set_footer(
-        text=f"X-Blaze Tracker | {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC",
+        text=f"BloxPulse · Monitoring System | {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC",
         icon_url=BOT_AVATAR_URL,
     )
     return embed

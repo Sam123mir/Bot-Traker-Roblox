@@ -57,3 +57,4 @@ BOT_NAME       = "BloxPulse · Roblox Monitor"
 BOT_AVATAR_URL = "https://cdn-icons-png.flaticon.com/512/8157/8157523.png"
 ROBLOX_ICON    = "https://cdn-icons-png.flaticon.com/512/18868/18868601.png"
 ROBLOX_URL     = "https://www.roblox.com"
+OFFICIAL_SERVER_URL = "https://discord.gg/REPLACE_ME" # Placeholder for user's community server

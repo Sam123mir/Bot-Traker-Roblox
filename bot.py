@@ -196,19 +196,34 @@ class AnnouncementModal(discord.ui.Modal, title='🚀 Create BloxPulse Update'):
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         
-        # Build the announcement embed
+        # Build the premium announcement embed
         embed = discord.Embed(
-            title=f"📢 {self.ann_title.value}",
-            description=f"**Version**: `{self.version.value}`\n\n{self.changes.value}",
+            title=f"� BloxPulse Update: {self.ann_title.value}",
+            description=(
+                f"**New Version**: `{self.version.value}`\n\n"
+                f"{self.changes.value}\n\n"
+                f"---"
+            ),
             color=0x00FFBB,
             timestamp=datetime.now(timezone.utc)
         )
         if self.image_url.value:
             embed.set_image(url=self.image_url.value)
+        else:
+            # Add bot logo as a large image if no other image is provided for a "wow" factor
+            embed.set_image(url=BOT_AVATAR_URL)
         
+        from config import OFFICIAL_SERVER_URL
+        embed.add_field(
+            name="🔗 Quick Links", 
+            value=f"[Official Community]({OFFICIAL_SERVER_URL}) • [Bot Invite](https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=2147566592&scope=bot%20applications.commands)",
+            inline=False
+        )
+        
+        embed.set_thumbnail(url=BOT_AVATAR_URL)
         embed.set_footer(
-            text=self.footer.value or "BloxPulse Global Announcements",
-            icon_url=bot.user.avatar.url if bot.user.avatar else None
+            text=self.footer.value or "BloxPulse · The standard for Roblox Monitoring",
+            icon_url=bot.user.avatar.url if bot.user.avatar else BOT_AVATAR_URL
         )
 
         channels = get_all_announcement_channels()
@@ -465,20 +480,18 @@ class ComparePrevView(discord.ui.View):
 @bot.tree.command(name="check", description="View current Roblox versions across all platforms.")
 async def check(interaction: discord.Interaction):
     await interaction.response.defer()
+    lang = get_guild_config(interaction.guild_id).get("language", "en")
     loop = asyncio.get_event_loop()
     versions = await loop.run_in_executor(None, fetch_all)
 
     embed = discord.Embed(
-        title="◈ Live Version Monitor",
-        description="Real-time Roblox build status across all supported platforms.\n\u200b",
+        title=f"◈ {get_text(lang, 'update_title', platform='Monitor')}",
+        description=get_text(lang, "startup_desc"),
         color=0x5865F2,
         timestamp=datetime.now(timezone.utc),
     )
     for key, vi in versions.items():
         plat = PLATFORMS[key]
-        state = get_version_data(key)
-        curr  = state.get("current", "")
-
         if vi:
             short = vi.version_hash.replace("version-", "")[:12]
             ver_line = f"```fix\n{vi.version}```"
@@ -796,27 +809,21 @@ async def myid(interaction: discord.Interaction):
 
 @bot.tree.command(name="invite", description="🚀 Get the link to add BloxPulse to your server.")
 async def invite(interaction: discord.Interaction):
+    lang = get_guild_config(interaction.guild_id).get("language", "en")
     invite_url = f"https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=2147566592&scope=bot%20applications.commands"
     
     embed = discord.Embed(
-        title="🚀 ¡Lleva a BloxPulse a tu Servidor!",
-        description=(
-            "¿Quieres tener el mejor monitor de Roblox en tu propia comunidad?\n\n"
-            "**Beneficios:**\n"
-            "✅ Alertas instantáneas de versiones.\n"
-            "✅ Historial completo de cambios.\n"
-            "✅ Comandos profesionales y rápidos.\n\n"
-            "Haz clic en el botón de abajo para autorizar el bot."
-        ),
+        title=get_text(lang, "invite_title"),
+        description=get_text(lang, "invite_desc"),
         color=0x5865F2,
         timestamp=datetime.now(timezone.utc)
     )
     embed.set_thumbnail(url=BOT_AVATAR_URL)
-    embed.set_footer(text="¡Gracias por ayudarnos a crecer! ✨", icon_url=BOT_AVATAR_URL)
+    embed.set_footer(text="BloxPulse · Community Growth", icon_url=BOT_AVATAR_URL)
     
     view = discord.ui.View()
     view.add_item(discord.ui.Button(
-        label="Agregar a Discord",
+        label=get_text(lang, "invite_btn"),
         style=discord.ButtonStyle.link,
         url=invite_url,
         emoji="🤖"
@@ -825,16 +832,55 @@ async def invite(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed, view=view)
 
 
+@bot.tree.command(name="setup_server", description="🏗️ Power-User: Create a professional server setup with categories and channels.")
+@app_commands.checks.has_permissions(manage_channels=True, manage_roles=True)
+async def setup_server(interaction: discord.Interaction):
+    """Automatically creates a professional server layout for BloxPulse."""
+    await interaction.response.defer(ephemeral=True)
+    guild = interaction.guild
+    lang = get_guild_config(guild.id).get("language", "en")
+
+    # Categories and Channels structure
+    structure = {
+        "◈ BloxPulse Info": ["#rules", "#announcements", "#official-server"],
+        "◈ BloxPulse Monitoring": ["#roblox-alerts"],
+        "◈ Community": ["#chat", "#bugs", "#suggestions"]
+    }
+
+    try:
+        await interaction.followup.send(get_text(lang, "setup_server_start"), ephemeral=True)
+        
+        for cat_name, channels in structure.items():
+            category = await guild.create_category(cat_name)
+            for chan_name in channels:
+                if "#announcements" in chan_name:
+                    channel = await guild.create_text_channel(chan_name.replace("#", ""), category=category, topic="BloxPulse Official News")
+                    # Auto-set as announcement channel for this guild
+                    set_guild_config(guild.id, "announcement_channel_id", channel.id)
+                elif "#roblox-alerts" in chan_name:
+                    channel = await guild.create_text_channel(chan_name.replace("#", ""), category=category, topic="Roblox Version Updates")
+                    # Auto-set as alert channel for this guild
+                    set_guild_config(guild.id, "channel_id", channel.id)
+                else:
+                    await guild.create_text_channel(chan_name.replace("#", ""), category=category)
+        
+        await interaction.followup.send(get_text(lang, "setup_server_done"), ephemeral=True)
+    except Exception as e:
+        await interaction.followup.send(f"❌ Error creating template: `{e}`", ephemeral=True)
+
+
 @bot.tree.command(name="help", description="Show a guide to all available commands.")
 async def help_cmd(interaction: discord.Interaction):
+    lang = get_guild_config(interaction.guild_id).get("language", "en")
+    
     embed = discord.Embed(
-        title="◈ BloxPulse Command Guide",
-        description="Full list of available commands by access level.\n\u200b",
+        title=get_text(lang, "help_title"),
+        description=get_text(lang, "help_desc"),
         color=0x5865F2,
         timestamp=datetime.now(timezone.utc),
     )
     embed.add_field(
-        name="👤 User Commands",
+        name=get_text(lang, "user_cmds"),
         value=(
             "`/check` — Live platform versions\n"
             "`/version` — History dropdown (last 7 days)\n"
@@ -851,26 +897,26 @@ async def help_cmd(interaction: discord.Interaction):
         inline=False,
     )
     embed.add_field(
-        name="🛡️ Admin Commands (Manage Server)",
+        name=get_text(lang, "admin_cmds"),
         value=(
-            "`/setup alerts` — Configure alert channel & role\n"
+            "`/setup alerts` — Configure alert channel\n"
             "`/setup announcements` — Configure news channel\n"
+            "`/setup_server` — Create pro server template 🏗️\n"
             "`/language` — Set server language\n"
             "`/config` — View current server config"
         ),
         inline=False,
     )
     embed.add_field(
-        name="⚙️ Owner Commands",
+        name=get_text(lang, "owner_cmds"),
         value=(
             "`/broadcast` — Send an update via Form (Modal)\n"
             "`/status` — System diagnostics\n"
-            "`/test` — Simulate a version update\n"
-            "`/reload` — Force immediate version check"
+            "`/test` — Simulate a version update"
         ),
         inline=False,
     )
-    embed.set_footer(text="BloxPulse Monitor", icon_url=BOT_AVATAR_URL)
+    embed.set_footer(text="BloxPulse Global Monitor", icon_url=BOT_AVATAR_URL)
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
