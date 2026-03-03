@@ -794,6 +794,37 @@ async def myid(interaction: discord.Interaction):
     )
 
 
+@bot.tree.command(name="invite", description="🚀 Get the link to add BloxPulse to your server.")
+async def invite(interaction: discord.Interaction):
+    invite_url = f"https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=2147566592&scope=bot%20applications.commands"
+    
+    embed = discord.Embed(
+        title="🚀 ¡Lleva a BloxPulse a tu Servidor!",
+        description=(
+            "¿Quieres tener el mejor monitor de Roblox en tu propia comunidad?\n\n"
+            "**Beneficios:**\n"
+            "✅ Alertas instantáneas de versiones.\n"
+            "✅ Historial completo de cambios.\n"
+            "✅ Comandos profesionales y rápidos.\n\n"
+            "Haz clic en el botón de abajo para autorizar el bot."
+        ),
+        color=0x5865F2,
+        timestamp=datetime.now(timezone.utc)
+    )
+    embed.set_thumbnail(url=BOT_AVATAR_URL)
+    embed.set_footer(text="¡Gracias por ayudarnos a crecer! ✨", icon_url=BOT_AVATAR_URL)
+    
+    view = discord.ui.View()
+    view.add_item(discord.ui.Button(
+        label="Agregar a Discord",
+        style=discord.ButtonStyle.link,
+        url=invite_url,
+        emoji="🤖"
+    ))
+    
+    await interaction.response.send_message(embed=embed, view=view)
+
+
 @bot.tree.command(name="help", description="Show a guide to all available commands.")
 async def help_cmd(interaction: discord.Interaction):
     embed = discord.Embed(
@@ -812,6 +843,7 @@ async def help_cmd(interaction: discord.Interaction):
             "`/platforms` — All tracked platforms\n"
             "`/ping` — Bot & API latency\n"
             "`/donate` — Support BloxPulse development 💖\n"
+            "`/invite` — Add BloxPulse to your server 🚀\n"
             "`/info` — Project details & credits ℹ️\n"
             "`/myid` — Your Discord ID\n"
             "`/help` — This menu"
