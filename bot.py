@@ -804,24 +804,40 @@ async def help_cmd(interaction: discord.Interaction):
 # ── ADMIN COMMANDS (Manage Server) ──────────────────────────
 # ═══════════════════════════════════════════════════════════════
 
-@bot.tree.command(name="setup", description="Configure where update notifications are sent.")
+@bot.tree.group(name="setup", description="🔧 Configure BloxPulse settings for your server.")
+@has_manage_guild()
+async def setup_group(interaction: discord.Interaction):
+    """Base group for setup commands."""
+    pass
+
+@setup_group.command(name="alerts", description="📡 Set the channel for Roblox version alerts.")
 @app_commands.describe(
     channel="Channel to receive updates",
     ping_role="Role to mention on each update (optional)"
 )
-@has_manage_guild()
-async def setup(interaction: discord.Interaction, channel: discord.TextChannel, ping_role: Optional[discord.Role] = None):
+async def setup_alerts(interaction: discord.Interaction, channel: discord.TextChannel, ping_role: Optional[discord.Role] = None):
     set_guild_config(interaction.guild_id, "channel_id", channel.id)
     if ping_role:
         set_guild_config(interaction.guild_id, "ping_role_id", ping_role.id)
 
     desc = (
-        "**Server notification settings updated.**\n\n"
-        f"● **Channel**: {channel.mention}\n"
-        f"● **Ping Role**: {ping_role.mention if ping_role else '`None — no pings`'}\n\n"
-        f"*BloxPulse will now send Roblox update alerts to this channel.*"
+        "**✅ Configuración de Alertas Completada**\n\n"
+        f"● **Canal**: {channel.mention}\n"
+        f"● **Ping**: {ping_role.mention if ping_role else '`Desactivado`'}\n\n"
+        "*BloxPulse enviará alertas de versiones aquí.*"
     )
-    await premium_response(interaction, "Server Setup Complete", desc, color=0x2ECC71)
+    await premium_response(interaction, "Monitor Setup", desc, color=0x2ECC71)
+
+@setup_group.command(name="announcements", description="📢 Set the channel for BloxPulse news and updates.")
+@app_commands.describe(channel="Channel to receive dev updates")
+async def setup_announcements(interaction: discord.Interaction, channel: discord.TextChannel):
+    set_guild_config(interaction.guild_id, "announcement_channel_id", channel.id)
+    desc = (
+        "**✅ Canal de Noticias Configurado**\n\n"
+        f"● **Canal**: {channel.mention}\n\n"
+        "*Aquí recibirás noticias sobre nuevas funciones del bot.*"
+    )
+    await premium_response(interaction, "News Setup", desc, color=0x3498DB)
 
 
 @bot.tree.command(name="language", description="Set the default language for update notifications.")
@@ -877,7 +893,7 @@ async def status(interaction: discord.Interaction):
     )
 
 
-@bot.tree.command(name="config", description="View current bot configuration for this server.")
+@bot.tree.command(name="config", description="⚙️ View current BloxPulse configuration for this server.")
 @has_manage_guild()
 async def config_cmd(interaction: discord.Interaction):
     cfg       = get_guild_config(interaction.guild_id)
@@ -898,6 +914,26 @@ async def config_cmd(interaction: discord.Interaction):
         f"● **Language**: {lang_names.get(lang, lang)}"
     )
     await premium_response(interaction, "Server Configuration", desc, color=0x3498DB)
+
+
+@bot.tree.command(name="donate", description="💖 Support BloxPulse development and hosting.")
+async def donate(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="💖 Support BloxPulse Development",
+        description=(
+            "Si te gusta **BloxPulse** y quieres apoyar su mantenimiento (servidores y café ☕), "
+            "puedes hacerlo mediante **PayPal**.\n\n"
+            "**PayPal**: `Cuentadepruebas750@gmail.com`\n\n"
+            "¡Cada donación nos ayuda a seguir trayendo mejoras constantes y mantenernos 24/7!"
+        ),
+        color=0x00FFBB,
+        timestamp=datetime.now(timezone.utc)
+    )
+    embed.set_thumbnail(url="https://cdn-icons-png.flaticon.com/512/174/174861.png")
+    embed.set_footer(text="Gracias por tu apoyo ❤️", icon_url=interaction.user.avatar.url if interaction.user.avatar else None)
+    
+    view = DonationView()
+    await interaction.response.send_message(embed=embed, view=view)
 
 
 @bot.tree.command(name="test", description="Send a preview of the latest update embed (Owner only).")
@@ -979,7 +1015,7 @@ async def reload(interaction: discord.Interaction):
         await interaction.followup.send(f"❌ Cycle failed: `{e}`", ephemeral=True)
 
 
-@bot.tree.command(name="guilds", description="List all servers using X-Blaze (Owner only).")
+@bot.tree.command(name="guilds", description="📂 List all servers using BloxPulse (Owner only).")
 @is_owner()
 async def guilds(interaction: discord.Interaction):
     guild_lines = []
