@@ -2,27 +2,28 @@
 
 Monitor de versiones de Roblox profesional con historial, comparativas y notificaciones multilingües.
 
-## 🚀 Despliegue: Northflank + UptimeRobot (Recomendado)
+## 🚀 Despliegue: Render + UptimeRobot (24/7 Gratis)
 
-Northflank es una excelente opción profesional para el bot.
+Render es la opción más sencilla y confiable para este bot.
 
 ### 1. Preparación en GitHub
 1. Asegúrate de que tu código esté en tu repositorio: `https://github.com/Sam123mir/Bot-Traker-Roblox.git`.
-2. He incluido un **Dockerfile** para que Northflank lo detecte automáticamente.
+2. He incluido un **Dockerfile** para que Render lo detecte y despliegue sin errores de entorno.
 
-### 2. Configuración en Northflank
-1. Crea un **New Service** -> **Combined Service**.
+### 2. Configuración en Render
+1. Crea un **New Web Service**.
 2. **Repository**: Conecta tu repositorio de GitHub.
-3. **Build Settings**: Northflank detectará el `Dockerfile`.
-4. **Environment Variables**:
+3. **Runtime**: Selecciona **Docker** (Render detectará automáticamente el archivo `Dockerfile` que creamos).
+4. **Plan**: Elige el **Free Plan**.
+5. **Environment Variables**:
     - `DISCORD_BOT_TOKEN`: Tu token de Discord.
-    - `PORT`: 8080
-5. **Port Settings**: Expón el puerto `8080` (HTTP).
-6. **Health Check**: Configura un Health Check HTTP a la ruta `/` en el puerto `8080`.
+6. **Despliegue**: Dale a "Create Web Service".
 
-### 3. Mantener vivo con UptimeRobot
-1. Una vez desplegado, Northflank te dará una URL (ej: `https://tu-servicio.code.run`).
-2. Configura esa URL en [UptimeRobot.com](https://uptimerobot.com/) para que haga ping cada 5 minutos. Esto evitará que la instancia entre en suspensión en planes gratuitos.
+### 3. Evitar que se duerma (UptimeRobot)
+Render apaga los servicios gratuitos tras 15 minutos sin visitas.
+1. Copia la URL que te dio Render (ej: `https://tu-bot.onrender.com`).
+2. Ve a [UptimeRobot.com](https://uptimerobot.com/) y crea un monitor **HTTP(s)** con esa URL cada 5 minutos.
+3. Esto mantendrá al bot despierto las 24 horas del día.
 
 ## 🛠️ Comandos
 
