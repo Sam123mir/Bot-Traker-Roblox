@@ -264,8 +264,11 @@ def build_announcement_embed(ann_data: dict) -> discord.Embed:
         value=f"**[Comunidad oficial]({OFFICIAL_SERVER_URL})** | **[Invitación de bot](https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=8&scope=bot%20applications.commands)**",
         inline=False
     )
-    embed.set_thumbnail(url=BOT_AVATAR_URL)
-    embed.set_footer(text=ann_data["footer"], icon_url=BOT_AVATAR_URL)
+    
+    # Use real bot avatar for thumbnail instead of the Flaticon dots
+    avatar_url = bot.user.display_avatar.url if bot.user else BOT_AVATAR_URL
+    embed.set_thumbnail(url=avatar_url)
+    embed.set_footer(text=ann_data["footer"], icon_url=avatar_url)
     return embed
 
 
@@ -283,11 +286,15 @@ class AnnouncementReviewView(discord.ui.View):
         # Save to history
         save_announcement(self.ann_data)
         
+        # Prepare the view for the broadcast (Dropdown with history)
+        history = get_announcements()
+        broadcast_view = UpdatesHistoryView(history) if history else None
+
         channels = get_all_announcement_channels()
         count = 0
         failed = 0
 
-        # Disable buttons while sending
+        # Disable buttons on the preview stage
         for item in self.children:
             item.disabled = True
         await interaction.edit_original_response(view=self)
@@ -296,7 +303,7 @@ class AnnouncementReviewView(discord.ui.View):
             channel = bot.get_channel(channel_id)
             if channel:
                 try:
-                    await channel.send(embed=self.embed)
+                    await channel.send(embed=self.embed, view=broadcast_view)
                     count += 1
                 except:
                     failed += 1
