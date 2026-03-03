@@ -1,5 +1,5 @@
 # ============================================================
-#   X-Blaze | Roblox Version Monitor — bot.py
+#   BloxPulse | Roblox Version Monitor — bot.py
 #   Full Discord Bot — architected for stability and premium UX.
 # ============================================================
 
@@ -23,7 +23,7 @@ load_dotenv()
 
 from config import DISCORD_BOT_TOKEN, DEVELOPERS, PLATFORMS, CHECK_INTERVAL, BOT_NAME, BOT_AVATAR_URL
 from core.checker import fetch_all, VersionInfo
-from core.storage import get_version_data, update_version, get_all_guilds, get_guild_config, set_guild_config
+from core.storage import get_version_data, update_version, get_all_guilds, get_guild_config, set_guild_config, get_all_announcement_channels
 from core.notifier import build_update_embed, create_language_view
 from core.history import fetch_deploy_history, make_rdd_url
 from core.i18n import get_text
@@ -40,7 +40,7 @@ logging.basicConfig(
         logging.FileHandler(_os.path.join(_LOG_DIR, "bot.log"), encoding="utf-8")
     ]
 )
-logger = logging.getLogger("X-Blaze")
+logger = logging.getLogger("BloxPulse")
 
 # ── Platform Map ─────────────────────────────────────────────
 # Maps slash command choice values → internal platform keys
@@ -51,25 +51,55 @@ _PLATFORM_CHOICES = {
     "ios":     "iOS",
 }
 
-# ── Bot Class ─────────────────────────────────────────────────
-class XBlazeBot(commands.Bot):
+# ── Bot Instance ─────────────────────────────────────────────
+
+class BloxPulseBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
         intents.message_content = True
-        intents.members = True
-        super().__init__(command_prefix="!", intents=intents)
+        super().__init__(
+            command_prefix="!",
+            intents=intents,
+            help_command=None
+        )
         self.start_time = time.time()
+        self.is_ready_flag = False
 
     async def setup_hook(self):
-        self.monitor_task.start()
+        logger.info("BloxPulse: Bot configured and slash commands synchronized.")
+        # Ensure data dir exists
+        _os.makedirs("data", exist_ok=True)
+        self.monitor_task.start() # Changed from self.loop.create_task(self.check_loop())
         await self.tree.sync()
-        logger.info("Bot configured and slash commands synchronized.")
 
     async def on_ready(self):
-        logger.info(f"Connected as {self.user} (ID: {self.user.id})")
+        logger.info(f"BloxPulse: Connected as {self.user} (ID: {self.user.id})")
         await self.change_presence(
             activity=discord.Activity(type=discord.ActivityType.watching, name="Roblox Updates")
         )
+        self.is_ready_flag = True
+
+    async def on_guild_join(self, guild: discord.Guild):
+        """Welcome message and setup prompt."""
+        logger.info(f"BloxPulse: Joined new guild: {guild.name} ({guild.id})")
+        # Try to find a system channel or a general text channel
+        target = guild.system_channel or next((c for c in guild.text_channels if c.permissions_for(guild.me).send_messages), None)
+        if target:
+            embed = discord.Embed(
+                title="👋 ¡Gracias por elegir BloxPulse!",
+                description=(
+                    "Soy tu monitor profesional de versiones de Roblox.\n\n"
+                    "**Próximos pasos recomendados:**\n"
+                    "1️⃣ Usa `/setup announcements` para elegir un canal donde recibirás noticias mías.\n"
+                    "2️⃣ Usa `/config channel` para configurar el canal de alertas de versiones.\n"
+                    "3️⃣ Usa `/check` para ver las versiones actuales.\n\n"
+                    "¡Es un placer estar aquí!"
+                ),
+                color=0x00FFBB
+            )
+            embed.set_footer(text="BloxPulse Global Monitor", icon_url=self.user.avatar.url if self.user.avatar else None)
+            try: await target.send(embed=embed)
+            except: pass
 
     @tasks.loop(seconds=CHECK_INTERVAL)
     async def monitor_task(self):
@@ -77,21 +107,20 @@ class XBlazeBot(commands.Bot):
         try:
             logger.info("Starting monitoring cycle...")
             loop = asyncio.get_event_loop()
-            current_versions = await loop.run_in_executor(None, fetch_all)
+            # fetch_all now returns a dict of {key: VersionCheckResult}
+            results = await loop.run_in_executor(None, fetch_all)
 
-            for key, vi in current_versions.items():
-                if not vi:
-                    continue
-                state = get_version_data(key)
-                stored_hash = state.get("current")
+            for key, result in results.items():
+                if not result:
+                    continue # Skip if no data was fetched for this platform
 
-                if stored_hash and stored_hash != vi.version_hash:
-                    logger.info(f"Change detected in {key}: {stored_hash} -> {vi.version_hash}")
-                    update_version(key, vi.version_hash)
-                    await self.broadcast_update(key, vi, stored_hash)
-                elif not stored_hash:
-                    logger.info(f"Registering initial version for {key}: {vi.version_hash}")
-                    update_version(key, vi.version_hash)
+                if result.get("changed"):
+                    vi = result["new_version_info"]
+                    logger.info(f"BloxPulse: Change detected for {key} -> {vi.version_hash}")
+                    update_version(key, vi.version_hash) # Update the stored version
+                    await self.broadcast_update(key, vi, result["old_version_hash"])
+                else:
+                    logger.debug(f"BloxPulse: No change for {key}")
 
         except Exception as e:
             logger.error(f"Error in monitor_task: {e}", exc_info=True)
@@ -118,7 +147,93 @@ class XBlazeBot(commands.Bot):
             except Exception as e:
                 logger.warning(f"Could not send to guild {gid_str}: {e}")
 
-bot = XBlazeBot()
+bot = BloxPulseBot()
+
+# ═══════════════════════════════════════════════════════════════
+# ── ANNOUNCEMENT MODAL ───────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════
+
+class AnnouncementModal(discord.ui.Modal, title='🚀 Create BloxPulse Update'):
+    ann_title = discord.ui.TextInput(
+        label='Update Title',
+        placeholder='e.g., BloxPulse v1.5: Final Rebranding',
+        required=True,
+        max_length=100
+    )
+    version = discord.ui.TextInput(
+        label='Version Number',
+        placeholder='e.g., v1.5.0',
+        required=True,
+        max_length=20
+    )
+    changes = discord.ui.TextInput(
+        label='What\'s New?',
+        placeholder='• Rebranded to BloxPulse\n• Added /donate command\n• Fixed mobile detection...',
+        style=discord.TextStyle.paragraph,
+        required=True,
+        max_length=2000
+    )
+    image_url = discord.ui.TextInput(
+        label='Image URL (Optional)',
+        placeholder='https://example.com/image.png',
+        required=False
+    )
+    footer = discord.ui.TextInput(
+        label='Custom Footer (Optional)',
+        placeholder='Thanks for your support!',
+        required=False,
+        max_length=100
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        
+        # Build the announcement embed
+        embed = discord.Embed(
+            title=f"📢 {self.ann_title.value}",
+            description=f"**Version**: `{self.version.value}`\n\n{self.changes.value}",
+            color=0x00FFBB,
+            timestamp=datetime.now(timezone.utc)
+        )
+        if self.image_url.value:
+            embed.set_image(url=self.image_url.value)
+        
+        embed.set_footer(
+            text=self.footer.value or "BloxPulse Global Announcements",
+            icon_url=bot.user.avatar.url if bot.user.avatar else None
+        )
+
+        channels = get_all_announcement_channels()
+        count = 0
+        failed = 0
+
+        for channel_id in channels:
+            channel = bot.get_channel(channel_id)
+            if channel:
+                try:
+                    await channel.send(embed=embed)
+                    count += 1
+                except:
+                    failed += 1
+        
+        await interaction.followup.send(
+            f"✅ **Broadcast Complete!**\nSent to `{count}` servers.\nFailed in `{failed}` servers.",
+            ephemeral=True
+        )
+
+# ═══════════════════════════════════════════════════════════════
+# ── DONATION VIEW ────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════
+
+class DonationView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(discord.ui.Button(
+            label="Paypal: Cuentadepruebas750@gmail.com",
+            style=discord.ButtonStyle.link,
+            url="https://www.paypal.com/paypalme/YOUR_LINK_HERE", # Note: User provided email, typically we'd use a link
+            emoji="💳"
+        ))
 
 # ── UI Helpers ────────────────────────────────────────────────
 
@@ -143,7 +258,7 @@ async def premium_response(
             embed.add_field(name=f[0], value=f[1], inline=f[2] if len(f) > 2 else True)
     if thumbnail:
         embed.set_thumbnail(url=thumbnail)
-    embed.set_footer(text="X-Blaze Monitor", icon_url=BOT_AVATAR_URL)
+    embed.set_footer(text="BloxPulse Monitor", icon_url=BOT_AVATAR_URL)
     if interaction.response.is_done():
         await interaction.followup.send(embed=embed, ephemeral=ephemeral)
     else:
@@ -225,7 +340,7 @@ class VersionHistorySelect(discord.ui.Select):
         if rdd_url:
             embed.add_field(name="⬇️ Download",  value=f"[◈ Download via RDD]({rdd_url})", inline=False)
         embed.set_thumbnail(url=plat.get("icon_url", BOT_AVATAR_URL))
-        embed.set_footer(text="X-Blaze Monitor", icon_url=BOT_AVATAR_URL)
+        embed.set_footer(text="BloxPulse Monitor", icon_url=BOT_AVATAR_URL)
         await interaction.response.edit_message(embed=embed)
 
 
@@ -316,7 +431,7 @@ class ComparePrevSelect(discord.ui.Select):
             inline=True,
         )
         embed.set_thumbnail(url=plat.get("icon_url", BOT_AVATAR_URL))
-        embed.set_footer(text="X-Blaze Monitor", icon_url=BOT_AVATAR_URL)
+        embed.set_footer(text="BloxPulse Monitor", icon_url=BOT_AVATAR_URL)
         await interaction.response.edit_message(embed=embed)
 
 
@@ -361,7 +476,7 @@ async def check(interaction: discord.Interaction):
             inline=True,
         )
 
-    embed.set_footer(text="X-Blaze · Live Check", icon_url=BOT_AVATAR_URL)
+    embed.set_footer(text="BloxPulse · Live Check", icon_url=BOT_AVATAR_URL)
     await interaction.followup.send(embed=embed)
 
 
@@ -402,7 +517,7 @@ async def version_cmd(interaction: discord.Interaction, platform: str):
         else:
             embed.add_field(name="Status", value="```diff\n- Data unavailable```", inline=False)
         embed.set_thumbnail(url=plat["icon_url"])
-        embed.set_footer(text="X-Blaze Monitor", icon_url=BOT_AVATAR_URL)
+        embed.set_footer(text="BloxPulse Monitor", icon_url=BOT_AVATAR_URL)
         await interaction.followup.send(embed=embed)
         return
 
@@ -416,7 +531,7 @@ async def version_cmd(interaction: discord.Interaction, platform: str):
                 description="Could not fetch deployment history. The CDN may be temporarily unavailable.",
                 color=0xE74C3C,
                 timestamp=datetime.now(timezone.utc),
-            ).set_footer(text="X-Blaze Monitor", icon_url=BOT_AVATAR_URL),
+            ).set_footer(text="BloxPulse Monitor", icon_url=BOT_AVATAR_URL),
         )
         return
 
@@ -440,7 +555,7 @@ async def version_cmd(interaction: discord.Interaction, platform: str):
         )
 
     embed.set_thumbnail(url=plat["icon_url"])
-    embed.set_footer(text=f"X-Blaze · Last {len(entries)} versions · Use dropdown to inspect", icon_url=BOT_AVATAR_URL)
+    embed.set_footer(text=f"BloxPulse · Last {len(entries)} versions · Use dropdown to inspect", icon_url=BOT_AVATAR_URL)
     view = VersionHistoryView(platform_key, entries)
     await interaction.followup.send(embed=embed, view=view)
 
@@ -499,7 +614,7 @@ async def download(interaction: discord.Interaction, platform: str):
     else:
         embed.description = "```diff\n- Version data unavailable. Try again shortly.\n```"
 
-    embed.set_footer(text="X-Blaze Monitor", icon_url=BOT_AVATAR_URL)
+    embed.set_footer(text="BloxPulse Monitor", icon_url=BOT_AVATAR_URL)
     await interaction.followup.send(embed=embed, ephemeral=True)
 
 
@@ -531,7 +646,7 @@ async def compare(interaction: discord.Interaction, platform: str):
                 title="◈ No Current Version",
                 description="No version data available. Try `/check` first to initialize.",
                 color=0xE74C3C,
-            ).set_footer(text="X-Blaze Monitor", icon_url=BOT_AVATAR_URL),
+            ).set_footer(text="BloxPulse Monitor", icon_url=BOT_AVATAR_URL),
         )
         return
 
@@ -544,7 +659,7 @@ async def compare(interaction: discord.Interaction, platform: str):
                 title="◈ No Previous Versions",
                 description="No older versions found in the last 7 days to compare against.",
                 color=0xE67E22,
-            ).set_footer(text="X-Blaze Monitor", icon_url=BOT_AVATAR_URL),
+            ).set_footer(text="BloxPulse Monitor", icon_url=BOT_AVATAR_URL),
         )
         return
 
@@ -559,7 +674,7 @@ async def compare(interaction: discord.Interaction, platform: str):
         timestamp=datetime.now(timezone.utc),
     )
     embed.set_thumbnail(url=plat["icon_url"])
-    embed.set_footer(text=f"X-Blaze · {len(entries)} versions available", icon_url=BOT_AVATAR_URL)
+    embed.set_footer(text=f"BloxPulse · {len(entries)} versions available", icon_url=BOT_AVATAR_URL)
     view = ComparePrevView(platform_key, curr_hash, curr_ver, entries)
     await interaction.followup.send(embed=embed, view=view)
 
@@ -592,7 +707,7 @@ async def ping_cmd(interaction: discord.Interaction):
     h, m, s = int(uptime // 3600), int((uptime % 3600) // 60), int(uptime % 60)
 
     embed = discord.Embed(
-        title="◈ X-Blaze · Network Status",
+        title="◈ BloxPulse · Network Status",
         description="Real-time latency and connectivity diagnostics.\n\u200b",
         color=0x2ECC71 if (ws_latency < 200 and roblox_ok) else 0xE67E22,
         timestamp=datetime.now(timezone.utc),
@@ -600,10 +715,10 @@ async def ping_cmd(interaction: discord.Interaction):
     embed.add_field(name=f"{ws_indicator} Discord WebSocket", value=f"`{ws_latency} ms`",                          inline=True)
     embed.add_field(name=f"{rbl_indicator} Roblox API",       value=f"`{http_ms if http_ms >= 0 else 'Timeout'} ms`", inline=True)
     embed.add_field(name="⏱️ Uptime",                         value=f"`{h}h {m}m {s}s`",                           inline=True)
-    embed.add_field(name="🤖 Bot",                            value=f"`X-Blaze v1.4`",                              inline=True)
+    embed.add_field(name="🤖 Bot",                            value=f"`BloxPulse v1.4`",                              inline=True)
     embed.add_field(name="📡 Roblox API",                     value="`Online`" if roblox_ok else "`Unreachable`",   inline=True)
     embed.add_field(name="🔁 Check Interval",                 value=f"`{CHECK_INTERVAL}s`",                         inline=True)
-    embed.set_footer(text="X-Blaze Monitor", icon_url=BOT_AVATAR_URL)
+    embed.set_footer(text="BloxPulse Monitor", icon_url=BOT_AVATAR_URL)
     await interaction.followup.send(embed=embed, ephemeral=True)
 
 
@@ -611,7 +726,7 @@ async def ping_cmd(interaction: discord.Interaction):
 async def platforms(interaction: discord.Interaction):
     embed = discord.Embed(
         title="◈ Monitored Platforms",
-        description="X-Blaze actively tracks version changes on the following platforms:\n\u200b",
+        description="BloxPulse actively tracks version changes on the following platforms:\n\u200b",
         color=0x5865F2,
         timestamp=datetime.now(timezone.utc),
     )
@@ -624,7 +739,7 @@ async def platforms(interaction: discord.Interaction):
             value=f"```\n{display}```",
             inline=True,
         )
-    embed.set_footer(text="X-Blaze Monitor", icon_url=BOT_AVATAR_URL)
+    embed.set_footer(text="BloxPulse Monitor", icon_url=BOT_AVATAR_URL)
     await interaction.response.send_message(embed=embed)
 
 
@@ -641,7 +756,7 @@ async def myid(interaction: discord.Interaction):
 @bot.tree.command(name="help", description="Show a guide to all available commands.")
 async def help_cmd(interaction: discord.Interaction):
     embed = discord.Embed(
-        title="◈ X-Blaze Command Guide",
+        title="◈ BloxPulse Command Guide",
         description="Full list of available commands by access level.\n\u200b",
         color=0x5865F2,
         timestamp=datetime.now(timezone.utc),
@@ -655,6 +770,7 @@ async def help_cmd(interaction: discord.Interaction):
             "`/compare` — Compare current vs. older version\n"
             "`/platforms` — All tracked platforms\n"
             "`/ping` — Bot & API latency\n"
+            "`/donate` — Support BloxPulse development 💖\n"
             "`/myid` — Your Discord ID\n"
             "`/help` — This menu"
         ),
@@ -663,7 +779,8 @@ async def help_cmd(interaction: discord.Interaction):
     embed.add_field(
         name="🛡️ Admin Commands (Manage Server)",
         value=(
-            "`/setup` — Configure notification channel & role\n"
+            "`/setup` — Configure alert channel & role\n"
+            "`/setup announcements` — Configure news channel\n"
             "`/language` — Set server language\n"
             "`/config` — View current server config"
         ),
@@ -672,14 +789,14 @@ async def help_cmd(interaction: discord.Interaction):
     embed.add_field(
         name="⚙️ Owner Commands",
         value=(
+            "`/broadcast` — Send an update via Form (Modal)\n"
             "`/status` — System diagnostics\n"
             "`/test` — Simulate a version update\n"
-            "`/reload` — Force immediate version check\n"
-            "`/guilds` — List all guilds using the bot"
+            "`/reload` — Force immediate version check"
         ),
         inline=False,
     )
-    embed.set_footer(text="X-Blaze Monitor", icon_url=BOT_AVATAR_URL)
+    embed.set_footer(text="BloxPulse Monitor", icon_url=BOT_AVATAR_URL)
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
@@ -702,7 +819,7 @@ async def setup(interaction: discord.Interaction, channel: discord.TextChannel, 
         "**Server notification settings updated.**\n\n"
         f"● **Channel**: {channel.mention}\n"
         f"● **Ping Role**: {ping_role.mention if ping_role else '`None — no pings`'}\n\n"
-        "*X-Blaze will now send Roblox update alerts to this channel.*"
+        f"*BloxPulse will now send Roblox update alerts to this channel.*"
     )
     await premium_response(interaction, "Server Setup Complete", desc, color=0x2ECC71)
 
@@ -728,29 +845,14 @@ async def language(interaction: discord.Interaction, lang: str):
     )
 
 
-@bot.tree.command(name="config", description="View current bot configuration for this server.")
-@has_manage_guild()
-async def config_cmd(interaction: discord.Interaction):
-    cfg       = get_guild_config(interaction.guild_id)
-    ch_id     = cfg.get("channel_id")
-    role_id   = cfg.get("ping_role_id")
-    lang      = cfg.get("language", "en")
-    lang_names = {"en": "English 🇺🇸", "es": "Español 🇪🇸", "pt": "Português 🇧🇷", "ru": "Русский 🇷🇺", "fr": "Français 🇫🇷"}
-
-    ch_str   = f"<#{ch_id}>" if ch_id else "`Not configured`"
-    role_str = f"<@&{role_id}>" if role_id else "`None`"
-
-    desc = (
-        f"● **Notifications Channel**: {ch_str}\n"
-        f"● **Ping Role**: {role_str}\n"
-        f"● **Language**: {lang_names.get(lang, lang)}"
-    )
-    await premium_response(interaction, "Server Configuration", desc, color=0x3498DB)
-
-
 # ═══════════════════════════════════════════════════════════════
 # ── OWNER / DEV COMMANDS ────────────────────────────────────
 # ═══════════════════════════════════════════════════════════════
+
+@bot.tree.command(name="broadcast", description="Create and send a professional bot update (Owner only).")
+@is_owner()
+async def broadcast(interaction: discord.Interaction):
+    await interaction.response.send_modal(AnnouncementModal())
 
 @bot.tree.command(name="status", description="Advanced system diagnostics (Owner only).")
 @is_owner()
@@ -762,7 +864,7 @@ async def status(interaction: discord.Interaction):
         ("⏱️ Uptime",   f"`{h}h {m}m {s}s`",                 True),
         ("🏠 Guilds",   f"`{len(bot.guilds)} servers`",        True),
         ("📶 Latency",  f"`{round(bot.latency * 1000)}ms`",    True),
-        ("🤖 Version",  "`X-Blaze v1.4 · Stable`",            True),
+        ("🤖 Version",  "`BloxPulse v1.5 · Global`",            True),
         ("🔁 Interval", f"`{CHECK_INTERVAL}s cycles`",         True),
         ("👑 Owner",    f"`{interaction.user.id}`",             True),
     ]
@@ -773,6 +875,29 @@ async def status(interaction: discord.Interaction):
         color=0x27AE60,
         fields=fields,
     )
+
+
+@bot.tree.command(name="config", description="View current bot configuration for this server.")
+@has_manage_guild()
+async def config_cmd(interaction: discord.Interaction):
+    cfg       = get_guild_config(interaction.guild_id)
+    ch_id     = cfg.get("channel_id")
+    role_id   = cfg.get("ping_role_id")
+    ann_id    = cfg.get("announcement_channel_id")
+    lang      = cfg.get("language", "en")
+    lang_names = {"en": "English 🇺🇸", "es": "Español 🇪🇸", "pt": "Português 🇧🇷", "ru": "Русский 🇷🇺", "fr": "Français 🇫🇷"}
+
+    ch_str   = f"<#{ch_id}>" if ch_id else "`Not configured`"
+    role_str = f"<@&{role_id}>" if role_id else "`None`"
+    ann_str  = f"<#{ann_id}>" if ann_id else "`Not set`"
+
+    desc = (
+        f"● **Alerts Channel**: {ch_str}\n"
+        f"● **Ping Role**: {role_str}\n"
+        f"● **Updates Channel**: {ann_str}\n"
+        f"● **Language**: {lang_names.get(lang, lang)}"
+    )
+    await premium_response(interaction, "Server Configuration", desc, color=0x3498DB)
 
 
 @bot.tree.command(name="test", description="Send a preview of the latest update embed (Owner only).")
@@ -811,7 +936,7 @@ async def test(interaction: discord.Interaction, platform: str):
                     title="◈ No Version Data",
                     description=f"No stored or live version found for **{PLATFORMS[platform]['label']}**.\nTry `/check` first.",
                     color=0xE74C3C, timestamp=datetime.now(timezone.utc)
-                ).set_footer(text="X-Blaze Monitor", icon_url=BOT_AVATAR_URL),
+                ).set_footer(text="BloxPulse Monitor", icon_url=BOT_AVATAR_URL),
                 ephemeral=True
             )
             return
@@ -828,7 +953,7 @@ async def test(interaction: discord.Interaction, platform: str):
             title="◈ Preview Sent",
             description=f"Embed sent for **{PLATFORMS[platform]['label']}**\nHash: `{vi.version_hash}`",
             color=0x27AE60, timestamp=datetime.now(timezone.utc)
-        ).set_footer(text="X-Blaze Monitor", icon_url=BOT_AVATAR_URL),
+        ).set_footer(text="BloxPulse Monitor", icon_url=BOT_AVATAR_URL),
         ephemeral=True
     )
 
@@ -847,7 +972,7 @@ async def reload(interaction: discord.Interaction):
                 description=f"✅ Fetched data for: `{platform_list}`\nAll changes will be broadcast if detected.",
                 color=0x27AE60,
                 timestamp=datetime.now(timezone.utc),
-            ).set_footer(text="X-Blaze Monitor", icon_url=BOT_AVATAR_URL),
+            ).set_footer(text="BloxPulse Monitor", icon_url=BOT_AVATAR_URL),
             ephemeral=True,
         )
     except Exception as e:
@@ -897,7 +1022,7 @@ def home():
 
     return {
         "status": "online",
-        "bot": "X-Blaze v1.4",
+        "bot": "BloxPulse v1.5",
         "uptime": f"{h}h {m}m {s}s",
         "latency": latency,
         "guilds": len(bot.guilds)

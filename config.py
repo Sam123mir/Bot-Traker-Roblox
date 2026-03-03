@@ -53,7 +53,7 @@ PLATFORMS: dict = {
 }
 
 # ── Branding ──────────────────────────────────────────────────
-BOT_NAME       = "X-Blaze · Roblox Monitor"
-BOT_AVATAR_URL = "https://cdn-icons-png.flaticon.com/512/18868/18868601.png"
+BOT_NAME       = "BloxPulse · Roblox Monitor"
+BOT_AVATAR_URL = "https://cdn-icons-png.flaticon.com/512/8157/8157523.png"
 ROBLOX_ICON    = "https://cdn-icons-png.flaticon.com/512/18868/18868601.png"
 ROBLOX_URL     = "https://www.roblox.com"

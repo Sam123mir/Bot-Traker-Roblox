@@ -1,5 +1,5 @@
 # ============================================================
-#   X-Blaze | Roblox Version Monitor — storage.py
+#   BloxPulse | Roblox Version Monitor — storage.py
 #   Version persistence and server configuration.
 # ============================================================
 
@@ -91,15 +91,31 @@ def get_guild_config(guild_id: int) -> dict:
         "channel_id":   None,
         "ping_role_id": None,
         "language":     "en",
+        "announcement_channel_id": None,
     })
 
 def set_guild_config(guild_id: int, key: str, value) -> bool:
     data = _load_json(GUILDS_FILE)
     gid  = str(guild_id)
     if gid not in data:
-        data[gid] = {"channel_id": None, "ping_role_id": None, "language": "en"}
+        data[gid] = {
+            "channel_id": None, 
+            "ping_role_id": None, 
+            "language": "en",
+            "announcement_channel_id": None
+        }
     data[gid][key] = value
     return _save_json(GUILDS_FILE, data)
 
 def get_all_guilds() -> dict:
     return _load_json(GUILDS_FILE)
+
+def get_all_announcement_channels() -> list[int]:
+    """Returns a list of all configured announcement channel IDs."""
+    data = get_all_guilds()
+    channels = []
+    for config in data.values():
+        chan_id = config.get("announcement_channel_id")
+        if chan_id:
+            channels.append(int(chan_id))
+    return channels
