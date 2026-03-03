@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # ============================================================
-#   X-Blaze | Roblox Version Monitor — test_embeds.py
+#   BloxPulse | Roblox Version Monitor — test_embeds.py
 #   Previsualiza todos los embeds en Discord sin iniciar
 #   el monitor completo. Ideal para validar el diseño.
 #
@@ -66,7 +66,7 @@ MOCK_PREV_HASHES: dict[str, str] = {
 
 def run_test(keys: list[str]) -> None:
     print(f"\n{'─'*55}")
-    print(f"  X-Blaze · Test de Embeds")
+    print(f"  BloxPulse · Test de Embeds")
     print(f"  Plataformas a probar: {keys}")
     print(f"{'─'*55}\n")
 

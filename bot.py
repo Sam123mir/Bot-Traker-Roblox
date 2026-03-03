@@ -944,7 +944,10 @@ setup_group = app_commands.Group(name="setup", description="🔧 Configure BloxP
     channel="Channel to receive updates",
     ping_role="Role to mention on each update (optional)"
 )
-async def setup_alerts(interaction: discord.Interaction, channel: discord.TextChannel, ping_role: Optional[discord.Role] = None):
+async def setup_alerts(interaction: discord.Interaction, channel: discord.abc.GuildChannel, ping_role: Optional[discord.Role] = None):
+    if not hasattr(channel, "send"):
+        return await premium_response(interaction, "Invalid Channel", "Please select a text, news, or voice channel where the bot can speak.", color=0xE74C3C)
+
     set_guild_config(interaction.guild_id, "channel_id", channel.id)
     if ping_role:
         set_guild_config(interaction.guild_id, "ping_role_id", ping_role.id)
@@ -959,7 +962,10 @@ async def setup_alerts(interaction: discord.Interaction, channel: discord.TextCh
 
 @setup_group.command(name="announcements", description="📢 Set the channel for BloxPulse news and updates.")
 @app_commands.describe(channel="Channel to receive dev updates")
-async def setup_announcements(interaction: discord.Interaction, channel: discord.TextChannel):
+async def setup_announcements(interaction: discord.Interaction, channel: discord.abc.GuildChannel):
+    if not hasattr(channel, "send"):
+        return await premium_response(interaction, "Invalid Channel", "Please select a text-based channel.", color=0xE74C3C)
+
     set_guild_config(interaction.guild_id, "announcement_channel_id", channel.id)
     desc = (
         "**✅ Canal de Noticias Configurado**\n\n"
