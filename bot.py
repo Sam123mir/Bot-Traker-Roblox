@@ -804,11 +804,8 @@ async def help_cmd(interaction: discord.Interaction):
 # ── ADMIN COMMANDS (Manage Server) ──────────────────────────
 # ═══════════════════════════════════════════════════════════════
 
-@bot.tree.group(name="setup", description="🔧 Configure BloxPulse settings for your server.")
-@has_manage_guild()
-async def setup_group(interaction: discord.Interaction):
-    """Base group for setup commands."""
-    pass
+# ── Admin Group ──
+setup_group = app_commands.Group(name="setup", description="🔧 Configure BloxPulse settings for your server.")
 
 @setup_group.command(name="alerts", description="📡 Set the channel for Roblox version alerts.")
 @app_commands.describe(
@@ -1072,4 +1069,8 @@ def run_web_server():
 if __name__ == "__main__":
     # Iniciar Flask en un hilo para UptimeRobot
     threading.Thread(target=run_web_server, daemon=True).start()
+    
+    # Register the group
+    bot.tree.add_command(setup_group)
+    
     bot.run(DISCORD_BOT_TOKEN)
