@@ -29,6 +29,14 @@ from core.notifier import build_update_embed, create_language_view
 from core.history import fetch_deploy_history, make_rdd_url
 from core.i18n import get_text
 
+# ── Version Definition ───────────────────────────────────────
+BOT_VERSION = "v1.9.0"
+
+from discord.ext import tasks
+
+# ── Global Status Tracking ────────────────────────────────────
+API_STATUS = {"WindowsPlayer": True, "MacPlayer": True, "AndroidApp": True, "iOS": True}
+
 # ── Logging ──────────────────────────────────────────────────
 _LOG_DIR = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "logs")
 _os.makedirs(_LOG_DIR, exist_ok=True)
@@ -80,9 +88,69 @@ class BloxPulseBot(commands.Bot):
             activity=discord.Activity(type=discord.ActivityType.watching, name="Roblox Updates")
         )
         self.is_ready_flag = True
-        # Update member count status channels for all guilds
+        # Update dynamic status for all guilds on startup
         for guild in self.guilds:
-            await update_member_count_channel(guild)
+            await update_dynamic_status(guild)
+
+    async def on_member_join(self, member: discord.Member):
+        """Update member count channel."""
+        await update_dynamic_status(member.guild)
+
+    async def on_member_remove(self, member: discord.Member):
+        """Update member count channel."""
+        await update_dynamic_status(member.guild)
+
+    @tasks.loop(seconds=CHECK_INTERVAL)
+    async def monitor_task(self):
+        """Background loop to check for Roblox version changes."""
+        if not self.is_ready_flag: return
+        
+        loop = asyncio.get_event_loop()
+        try:
+            results = await loop.run_in_executor(None, fetch_all)
+            await update_api_health(results)
+            
+            for plat_key, vi in results.items():
+                if not vi: continue
+                
+                state = get_version_data(plat_key)
+                prev_hash = state.get("current", "")
+                
+                if prev_hash and prev_hash != vi.version_hash:
+                    # New version detected!
+                    logger.info(f"🆕 [{plat_key}] Version change: {prev_hash} -> {vi.version_hash}")
+                    
+                    # Store update
+                    update_version(plat_key, vi.version_hash)
+                    
+                    # Notify all configured guilds
+                    from core.notifier import build_update_embed, create_language_view
+                    guilds_data = get_all_guilds()
+                    for gid, config in guilds_data.items():
+                        alert_chan_id = config.get("channel_id")
+                        if not alert_chan_id: continue
+                        
+                        channel = self.get_channel(int(alert_chan_id))
+                        if not channel: continue
+                        
+                        lang = config.get("language", "en")
+                        embed = build_update_embed(plat_key, vi, prev_hash, lang, bot_icon=self.user.display_avatar.url)
+                        view = create_language_view(plat_key, vi, prev_hash, lang)
+                        
+                        role_id = config.get("ping_role_id")
+                        content = f"<@&{role_id}>" if role_id else None
+                        
+                        try:
+                            await channel.send(content=content, embed=embed, view=view)
+                        except Exception as e:
+                            logger.error(f"Failed to send alert to {gid}: {e}")
+
+        except Exception as e:
+            logger.error(f"Error in monitor_task: {e}", exc_info=True)
+
+    @monitor_task.before_loop
+    async def before_monitor(self):
+        await self.wait_until_ready()
 
     async def on_guild_join(self, guild: discord.Guild):
         """Welcome message and setup prompt."""
@@ -347,7 +415,7 @@ class DonationView(discord.ui.View):
         self.add_item(discord.ui.Button(
             label="Paypal: Cuentadepruebas750@gmail.com",
             style=discord.ButtonStyle.link,
-            url="https://www.paypal.com/paypalme/YOUR_LINK_HERE", # Note: User provided email, typically we'd use a link
+            url="https://www.paypal.com/paypalme/Cuentadepruebas750", # Note: User provided email, typically we'd use a link
             emoji="💳"
         ))
 
@@ -993,25 +1061,42 @@ class SetupConfirmView(discord.ui.View):
         await interaction.response.edit_message(content="❌ Configuración cancelada.", embed=None, view=None)
 
 async def deploy_template(guild: discord.Guild):
+    # Cleanup: Delete previous BloxPulse channels and roles
+    # We look for prefixes used in previous versions
+    for channel in guild.channels:
+        if any(p in channel.name for p in ["BloxPulse", "❱", "┇═════"]):
+            try: await channel.delete()
+            except: pass
+    
+    prefixes = ["♕ 》", "🛡️ 》", "🛡 》", "👤 》", "♙ 》", "✱ 》", "BloxPulse"]
+    for role in guild.roles:
+        if any(p in role.name for p in prefixes):
+            try: await role.delete()
+            except: pass
+
     # Roles creation
     roles_data = [
         {"name": "♕ 》BloxPulse Owner",   "color": discord.Color.gold(),   "perm": discord.Permissions.all()},
-        {"name": "🛡️ 》BloxPulse Staff",   "color": discord.Color.blue(),   "perm": discord.Permissions(manage_messages=True, kick_members=True, mute_members=True)},
-        {"name": "👤 》Verified Member", "color": discord.Color.light_grey(), "perm": discord.Permissions.none()},
+        {"name": "♖ 》BloxPulse Staff",   "color": discord.Color.blue(),   "perm": discord.Permissions(manage_messages=True, kick_members=True, mute_members=True)},
+        {"name": "♙ 》Verified Member", "color": discord.Color.light_grey(), "perm": discord.Permissions.none()},
+        {"name": "✱ 》Ping Version Roblox", "color": discord.Color.red(), "perm": discord.Permissions.none(), "mention": True},
     ]
     
-    created_roles = {}
     for r_info in roles_data:
-        role = discord.utils.get(guild.roles, name=r_info["name"])
-        if not role:
-            role = await guild.create_role(name=r_info["name"], color=r_info["color"], permissions=r_info["perm"], hoist=True)
-        created_roles[r_info["name"]] = role
+        await guild.create_role(
+            name=r_info["name"], 
+            color=r_info["color"], 
+            permissions=r_info["perm"], 
+            hoist=True,
+            mentionable=r_info.get("mention", False)
+        )
 
     # Categories and Channels structure
     structure = [
         ("┇═════ STATUS ═════┇", [
             ("❱ Members: 0", discord.ChannelType.voice),
-            ("❱ Bot: Online", discord.ChannelType.voice)
+            (f"❱ Bot Version: {BOT_VERSION}", discord.ChannelType.voice),
+            ("❱ Status APIs: W:On|M:On|A:On|I:On", discord.ChannelType.voice)
         ]),
         ("┇═════ INFO ═════┇", [
             ("❱ rules", discord.ChannelType.text),
@@ -1244,7 +1329,7 @@ async def status(interaction: discord.Interaction):
         ("⏱️ Uptime",   f"`{h}h {m}m {s}s`",                 True),
         ("🏠 Guilds",   f"`{len(bot.guilds)} servers`",        True),
         ("📶 Latency",  f"`{round(bot.latency * 1000)}ms`",    True),
-        ("🤖 Version",  "`BloxPulse v1.7 · Premium`",           True),
+        ("🤖 Version",  f"`{BOT_VERSION} · Premium`",           True),
         ("🔁 Interval", f"`{CHECK_INTERVAL}s cycles`",         True),
         ("👑 Owner",    f"`{interaction.user.id}`",             True),
     ]
@@ -1423,7 +1508,7 @@ def home():
 
     return {
         "status": "online",
-        "bot": "BloxPulse v1.5",
+        "bot": f"BloxPulse {BOT_VERSION}",
         "uptime": f"{h}h {m}m {s}s",
         "latency": latency,
         "guilds": len(bot.guilds)
@@ -1431,7 +1516,6 @@ def home():
 
 def run_web_server():
     port = int(_os.environ.get("PORT", 8080))
-    # Flask en modo producción básico
     app.run(host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
@@ -1442,3 +1526,50 @@ if __name__ == "__main__":
     bot.tree.add_command(setup_group)
     
     bot.run(DISCORD_BOT_TOKEN)
+
+async def update_dynamic_status(guild: discord.Guild):
+    """Updates the status voice channels with real-time data."""
+    if not guild or not hasattr(guild, "voice_channels"): return
+    
+    # 1. Update Member Count
+    member_channel = discord.utils.get(guild.voice_channels, name=lambda n: "❱ Members:" in n)
+    if member_channel:
+        try:
+            await member_channel.edit(name=f"❱ Members: {guild.member_count}")
+        except: pass
+
+    # 2. Update Bot Version
+    version_channel = discord.utils.get(guild.voice_channels, name=lambda n: "❱ Bot Version:" in n)
+    if version_channel:
+        try:
+            await version_channel.edit(name=f"❱ Bot Version: {BOT_VERSION}")
+        except: pass
+
+    # 3. Update API Status
+    stats = []
+    stats.append("W:On" if API_STATUS.get("WindowsPlayer") else "W:Off")
+    stats.append("M:On" if API_STATUS.get("MacPlayer") else "M:Off")
+    stats.append("A:On" if API_STATUS.get("AndroidApp") else "A:Off")
+    stats.append("I:On" if API_STATUS.get("iOS") else "I:Off")
+    
+    api_channel = discord.utils.get(guild.voice_channels, name=lambda n: "❱ Status APIs:" in n)
+    if api_channel:
+        try:
+            new_name = f"❱ Status APIs: {'|'.join(stats)}"
+            if api_channel.name != new_name:
+                await api_channel.edit(name=new_name)
+        except: pass
+
+async def update_api_health(results: dict):
+    """Updates global API_STATUS and triggers guild channel updates."""
+    global API_STATUS
+    changed = False
+    for plat_key in API_STATUS.keys():
+        is_on = results.get(plat_key) is not None
+        if API_STATUS.get(plat_key) != is_on:
+            API_STATUS[plat_key] = is_on
+            changed = True
+    
+    if changed:
+        for guild in bot.guilds:
+            await update_dynamic_status(guild)
