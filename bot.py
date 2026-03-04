@@ -1518,14 +1518,6 @@ def run_web_server():
     port = int(_os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
 
-if __name__ == "__main__":
-    # Iniciar Flask en un hilo para UptimeRobot
-    threading.Thread(target=run_web_server, daemon=True).start()
-    
-    # Register the group
-    bot.tree.add_command(setup_group)
-    
-    bot.run(DISCORD_BOT_TOKEN)
 
 async def update_dynamic_status(guild: discord.Guild):
     """Updates the status voice channels with real-time data."""
@@ -1573,3 +1565,12 @@ async def update_api_health(results: dict):
     if changed:
         for guild in bot.guilds:
             await update_dynamic_status(guild)
+
+if __name__ == "__main__":
+    # Iniciar Flask en un hilo para UptimeRobot
+    threading.Thread(target=run_web_server, daemon=True).start()
+    
+    # Register the group
+    bot.tree.add_command(setup_group)
+    
+    bot.run(DISCORD_BOT_TOKEN)
