@@ -41,7 +41,9 @@ def build_update_embed(
     prev_hash: Optional[str],
     lang: str = "en",
     selected_hash: Optional[str] = None,  # None = show current vi
-    bot_icon: Optional[str] = None
+    bot_icon: Optional[str] = None,
+    is_build: bool = False,
+    history_data: Optional[list] = None
 ) -> discord.Embed:
     cfg   = PLATFORMS[platform_key]
     label = cfg["label"]
@@ -100,16 +102,35 @@ def build_update_embed(
     )
     description = f"{intro}\n\n{data_block}"
 
+    title = get_text(lang, "update_title", platform=label)
+    color = cfg["color"]
+    
+    if is_build:
+        title = f"⚠️ Build Detected on {label}!"
+        color = 0xF1C40F # Warning Yellow for pre-release
+        description = (
+            f"**{label} has just built a new version!**\n"
+            f"**THIS IS NOT A ROBLOX UPDATE**\n\n"
+            f"Roblox has just built a new version! This version might be the next update!\n\n"
+            f"{data_block}"
+        )
     embed = discord.Embed(
-        title=get_text(lang, "update_title", platform=label),
+        title=title,
         description=description,
         url=ROBLOX_URL,
-        color=cfg["color"],
+        color=color,
     )
     # Use bot avatar for thumbnail instead of placeholder icons
     avatar_url = bot_icon or BOT_AVATAR_URL
     embed.set_thumbnail(url=avatar_url)
-    embed.add_field(name="\u200b", value="\u200b", inline=False)
+    
+    if history_data:
+        history_text = ""
+        for item in history_data:
+            h_short = item["hash"].replace("version-", "")
+            history_text += f"• `{h_short}` — {item['date']}\n"
+        embed.add_field(name="📜 Recent History", value=history_text or "No history", inline=False)
+
     embed.add_field(
         name=f"*{t_dl_h}*",
         value=f"**[{dl_label}]({dl_url})**",

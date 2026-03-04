@@ -4,7 +4,7 @@
 # ============================================================
 
 import asyncio
-import os as _os
+import re
 import time
 import logging
 import aiohttp
@@ -12,7 +12,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, List
 import random
 import threading
 import math as _math
@@ -187,25 +187,49 @@ class BloxPulseBot(commands.Bot):
                 if not vi:
                     continue # Skip if no data was fetched for this platform
 
+                # 1. Official Update Check (clientsettingscdn)
                 state = get_version_data(key)
-                old_hash = state.get("current", "")
+                old_update_hash = state.get("last_update", "")
 
-                if old_hash and old_hash != vi.version_hash:
-                    logger.info(f"BloxPulse: Change detected for {key} -> {vi.version_hash}")
-                    update_version(key, vi.version_hash) # Update the stored version
-                    await self.broadcast_update(key, vi, old_hash)
-                elif not old_hash:
-                    # Initial run: store but don't broadcast
-                    logger.info(f"BloxPulse: Initializing data for {key} -> {vi.version_hash}")
-                    update_version(key, vi.version_hash)
-                else:
-                    logger.debug(f"BloxPulse: No change for {key}")
+                if old_update_hash and old_update_hash != vi.version_hash:
+                    logger.info(f"BloxPulse: Official Update detected for {key} -> {vi.version_hash}")
+                    update_version(key, vi.version_hash, is_official=True)
+                    await self.broadcast_update(key, vi, old_update_hash, is_build=False)
+                elif not old_update_hash:
+                    logger.info(f"BloxPulse: Initializing update data for {key} -> {vi.version_hash}")
+                    update_version(key, vi.version_hash, is_official=True)
+
+                # 2. Build Detection (DeployHistory.txt)
+                # Only for Windows/Mac
+                if key in ["WindowsPlayer", "MacPlayer"]:
+                    history_entries = fetch_deploy_history(key, days=1)
+                    if history_entries:
+                        latest_build = history_entries[0]
+                        latest_build_hash = latest_build["version_hash"]
+                        old_build_hash = state.get("last_build", "")
+                        
+                        # Trigger if it's a NEW build hash AND it's NOT the current official unit
+                        if latest_build_hash != old_build_hash and latest_build_hash != vi.version_hash:
+                            logger.info(f"BloxPulse: Pre-release Build detected for {key} -> {latest_build_hash}")
+                            update_version(key, latest_build_hash, is_official=False)
+                            
+                            # Create a VersionInfo for the build
+                            build_vi = VersionInfo(
+                                platform_key=key,
+                                version=latest_build["version"],
+                                version_hash=latest_build_hash,
+                                channel="Build-Testing",
+                                source="DeployHistory.txt"
+                            )
+                            await self.broadcast_update(key, build_vi, old_build_hash or old_update_hash, is_build=True)
+                        elif latest_build_hash == old_build_hash:
+                            logger.debug(f"BloxPulse: No new build for {key}")
 
         except Exception as e:
             logger.error(f"Error in monitor_task: {e}", exc_info=True)
 
-    async def broadcast_update(self, platform_key: str, vi: VersionInfo, prev_hash: str):
-        """Sends update to all configured guild channels."""
+    async def broadcast_update(self, platform_key: str, vi: VersionInfo, prev_hash: str, is_build: bool = False):
+        """Sends update/build alert to all configured guild channels."""
         guilds_data = get_all_guilds()
         for gid_str, config in guilds_data.items():
             channel_id = config.get("channel_id")
@@ -218,8 +242,16 @@ class BloxPulseBot(commands.Bot):
             lang    = config.get("language", "en")
             role_id = config.get("ping_role_id")
             mention = f"<@&{role_id}>" if role_id else None
+            # Fetch last 4 versions for the history field
+            state = get_version_data(platform_key)
+            history_hashes = state.get("history", [])[:4]
+            history_timestamps = state.get("timestamps", {})
+            history_data = []
+            for h in history_hashes:
+                history_data.append({"hash": h, "date": history_timestamps.get(h, "Unknown")})
+
             avatar_url = self.user.display_avatar.url if self.user else bot.user.display_avatar.url if bot.user else BOT_AVATAR_URL
-            embed   = build_update_embed(platform_key, vi, prev_hash, lang, bot_icon=avatar_url)
+            embed   = build_update_embed(platform_key, vi, prev_hash, lang, bot_icon=avatar_url, is_build=is_build, history_data=history_data)
             view    = create_language_view(platform_key, vi, prev_hash, lang)
 
             try:

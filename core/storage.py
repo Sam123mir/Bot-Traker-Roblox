@@ -50,35 +50,51 @@ def _now_str() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
 def get_version_data(platform_key: str) -> dict:
-    """Returns {'current': str, 'history': list, 'timestamps': dict}."""
+    """Returns {'current': str, 'last_update': str, 'last_build': str, 'history': list, 'timestamps': dict}."""
     data  = _load_json(VERSIONS_FILE)
     state = data.get(platform_key)
     if not isinstance(state, dict):
-        return {"current": str(state) if state else "", "history": [], "timestamps": {}}
-    # Ensure timestamps key exists (migration)
-    if "timestamps" not in state:
-        state["timestamps"] = {}
+        return {
+            "current": str(state) if state else "", 
+            "last_update": "",
+            "last_build": "",
+            "history": [], 
+            "timestamps": {}
+        }
+    # Ensure keys exist (migration)
+    if "timestamps" not in state: state["timestamps"] = {}
+    if "history" not in state: state["history"] = []
+    if "last_update" not in state: state["last_update"] = state.get("current", "")
+    if "last_build" not in state: state["last_build"] = ""
     return state
 
-def update_version(platform_key: str, new_hash: str) -> bool:
-    """Updates the current hash, saves it to history with a timestamp (max 10 entries)."""
+def update_version(platform_key: str, new_hash: str, is_official: bool = True) -> bool:
+    """
+    Updates the version record. 
+    If is_official=True, updates last_update.
+    If is_official=False, updates last_build.
+    Stores all versions in history (unlimited).
+    """
     full_data = _load_json(VERSIONS_FILE)
     state     = get_version_data(platform_key)
-    old_hash  = state.get("current", "")
-
+    history   = state.get("history", [])
     timestamps: dict = state.get("timestamps", {})
-
-    if old_hash and old_hash != new_hash:
-        history = state.get("history", [])
-        if old_hash not in history:
-            history.insert(0, old_hash)
-            state["history"] = history[:10]   # keep up to 10 entries
 
     # Record timestamp for new hash when first seen
     if new_hash not in timestamps:
         timestamps[new_hash] = _now_str()
 
-    state["current"]    = new_hash
+    # Add to history if unique
+    if new_hash not in history:
+        history.insert(0, new_hash)
+        state["history"] = history # No cap as requested: "keep all versions"
+
+    if is_official:
+        state["current"] = new_hash
+        state["last_update"] = new_hash
+    else:
+        state["last_build"] = new_hash
+
     state["timestamps"] = timestamps
     full_data[platform_key] = state
     return _save_json(VERSIONS_FILE, full_data)
