@@ -8,7 +8,7 @@ from discord.ui import View, Select
 from datetime import datetime, timezone
 from typing import Optional
 
-from config import PLATFORMS, BOT_AVATAR_URL, ROBLOX_URL
+from config import PLATFORMS, BOT_AVATAR_URL, ROBLOX_URL, BOT_VERSION
 from .checker import VersionInfo
 from .i18n import get_text
 from .storage import get_version_data
@@ -106,7 +106,9 @@ def build_update_embed(
         url=ROBLOX_URL,
         color=cfg["color"],
     )
-    embed.set_thumbnail(url=cfg["icon_url"])
+    # Use bot avatar for thumbnail instead of placeholder icons
+    avatar_url = bot_icon or BOT_AVATAR_URL
+    embed.set_thumbnail(url=avatar_url)
     embed.add_field(name="\u200b", value="\u200b", inline=False)
     embed.add_field(
         name=f"*{t_dl_h}*",
@@ -114,8 +116,8 @@ def build_update_embed(
         inline=False,
     )
     embed.set_footer(
-        text=f"BloxPulse · Monitoring System | {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC",
-        icon_url=bot_icon or BOT_AVATAR_URL,
+        text=f"BloxPulse {BOT_VERSION} · Professional Monitoring | {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC",
+        icon_url=avatar_url,
     )
     return embed
 

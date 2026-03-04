@@ -22,15 +22,13 @@ from dotenv import load_dotenv
 # Cargar variables de entorno desde .env si existe
 load_dotenv()
 
-from config import DISCORD_BOT_TOKEN, DEVELOPERS, PLATFORMS, CHECK_INTERVAL, BOT_NAME, BOT_AVATAR_URL, UPDATE_BANNER_URL
+from config import DISCORD_BOT_TOKEN, DEVELOPERS, PLATFORMS, CHECK_INTERVAL, BOT_NAME, BOT_AVATAR_URL, UPDATE_BANNER_URL, BOT_VERSION
 from core.checker import fetch_all, VersionInfo
 from core.storage import get_version_data, update_version, get_all_guilds, get_guild_config, set_guild_config, get_all_announcement_channels, save_announcement, get_announcements
 from core.notifier import build_update_embed, create_language_view
 from core.history import fetch_deploy_history, make_rdd_url
 from core.i18n import get_text
 
-# ── Version Definition ───────────────────────────────────────
-BOT_VERSION = "v1.9.0"
 
 from discord.ext import tasks
 
@@ -926,7 +924,7 @@ async def ping_cmd(interaction: discord.Interaction):
     embed.add_field(name="⏱️ Tiempo Activo",               value=f"`{h}h {m}m {s}s`", inline=True)
     embed.add_field(name="🔁 Ciclo de Monitoreo",          value=f"`{CHECK_INTERVAL}s`", inline=True)
     
-    embed.set_footer(text=f"BloxPulse v1.5 · {random.choice(['Estable', 'Operativo', 'Online'])}", icon_url=bot.user.display_avatar.url if bot.user else BOT_AVATAR_URL)
+    embed.set_footer(text=f"BloxPulse {BOT_VERSION} · {random.choice(['Estable', 'Operativo', 'Online'])}", icon_url=bot.user.display_avatar.url if bot.user else BOT_AVATAR_URL)
     await interaction.followup.send(embed=embed, ephemeral=True)
 
 
@@ -1022,7 +1020,8 @@ async def setup_server(interaction: discord.Interaction):
         "**ESTRUCTURA DE CANALES (Símbolos Piliapp)**\n"
         "┇═════ STATUS ═════┇\n"
         "❱ Members: [Conteo Real]\n"
-        "❱ Bot: Online\n\n"
+        f"❱ Bot Version: {BOT_VERSION}\n"
+        "❱ Status APIs: [W:On|M:On|A:On|I:On]\n\n"
         "┇═════ INFO ═════┇\n"
         "❱ Rules | ❱ Announcements | ❱ Official\n\n"
         "┇═════ MONITOR ═════┇\n"
@@ -1030,9 +1029,9 @@ async def setup_server(interaction: discord.Interaction):
         "┇═════ COMMUNITY ═════┇\n"
         "❱ General | ❱ Bug-Reports | ❱ Suggestions\n\n"
         "**ROLES PROFESIONALES**\n"
-        "♕ 》BloxPulse Owner (Admin)\n"
-        "🛡️ 》BloxPulse Staff (Staff)\n"
-        "👤 》Verified Member (Member)"
+        "♕ 》BloxPulse Owner (Owner)\n"
+        "♖ 》BloxPulse Staff (Staff)\n"
+        "♙ 》Verified Member (Verified)"
     )
     
     embed = discord.Embed(
@@ -1134,14 +1133,7 @@ async def deploy_template(guild: discord.Guild):
                     set_guild_config(guild.id, "channel_id", channel.id)
                     await channel.edit(topic="Roblox Version Updates")
 
-# Member count update logic
-@bot.event
-async def on_member_join(member):
-    await update_member_count_channel(member.guild)
-
-@bot.event
-async def on_member_remove(member):
-    await update_member_count_channel(member.guild)
+# Note: Member count updates are already handled by the BloxPulseBot class events
 
 async def update_member_count_channel(guild):
     for channel in guild.voice_channels:
