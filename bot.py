@@ -1020,8 +1020,12 @@ async def setup_server(interaction: discord.Interaction):
         "**ESTRUCTURA DE CANALES (Símbolos Piliapp)**\n"
         "┇═════ STATUS ═════┇\n"
         "❱ Members: [Conteo Real]\n"
-        f"❱ Bot Version: {BOT_VERSION}\n"
-        "❱ Status APIs: [W:On|M:On|A:On|I:On]\n\n"
+        f"❱ Bot Version: {BOT_VERSION}\n\n"
+        "┇═════ STATUS APIs ═════┇\n"
+        "❱ Windows: [🟢/🔴]\n"
+        "❱ Mac: [🟢/🔴]\n"
+        "❱ Android: [🟢/🔴]\n"
+        "❱ iOS: [🟢/🔴]\n\n"
         "┇═════ INFO ═════┇\n"
         "❱ Rules | ❱ Announcements | ❱ Official\n\n"
         "┇═════ MONITOR ═════┇\n"
@@ -1094,8 +1098,13 @@ async def deploy_template(guild: discord.Guild):
     structure = [
         ("┇═════ STATUS ═════┇", [
             ("❱ Members: 0", discord.ChannelType.voice),
-            (f"❱ Bot Version: {BOT_VERSION}", discord.ChannelType.voice),
-            ("❱ Status APIs: W:On|M:On|A:On|I:On", discord.ChannelType.voice)
+            (f"❱ Bot Version: {BOT_VERSION}", discord.ChannelType.voice)
+        ]),
+        ("┇═════ STATUS APIs ═════┇", [
+            ("❱ Windows: 🟢", discord.ChannelType.voice),
+            ("❱ Mac: 🟢", discord.ChannelType.voice),
+            ("❱ Android: 🟢", discord.ChannelType.voice),
+            ("❱ iOS: 🟢", discord.ChannelType.voice)
         ]),
         ("┇═════ INFO ═════┇", [
             ("❱ rules", discord.ChannelType.text),
@@ -1529,20 +1538,25 @@ async def update_dynamic_status(guild: discord.Guild):
             await version_channel.edit(name=f"❱ Bot Version: {BOT_VERSION}")
         except: pass
 
-    # 3. Update API Status
-    stats = []
-    stats.append("W:On" if API_STATUS.get("WindowsPlayer") else "W:Off")
-    stats.append("M:On" if API_STATUS.get("MacPlayer") else "M:Off")
-    stats.append("A:On" if API_STATUS.get("AndroidApp") else "A:Off")
-    stats.append("I:On" if API_STATUS.get("iOS") else "I:Off")
+    # 3. Update API Status Channels (Granular)
+    status_map = {
+        "Windows": API_STATUS.get("WindowsPlayer"),
+        "Mac": API_STATUS.get("MacPlayer"),
+        "Android": API_STATUS.get("AndroidApp"),
+        "iOS": API_STATUS.get("iOS")
+    }
     
-    api_channel = discord.utils.get(guild.voice_channels, name=lambda n: "❱ Status APIs:" in n)
-    if api_channel:
-        try:
-            new_name = f"❱ Status APIs: {'|'.join(stats)}"
-            if api_channel.name != new_name:
-                await api_channel.edit(name=new_name)
-        except: pass
+    for platform, is_online in status_map.items():
+        emoji = "🟢" if is_online else "🔴"
+        new_name = f"❱ {platform}: {emoji}"
+        
+        # Find exact channel by prefix
+        chan = discord.utils.get(guild.voice_channels, name=lambda n: f"❱ {platform}:" in n)
+        if chan:
+            try:
+                if chan.name != new_name:
+                    await chan.edit(name=new_name)
+            except: pass
 
 async def update_api_health(results: dict):
     """Updates global API_STATUS and triggers guild channel updates."""
