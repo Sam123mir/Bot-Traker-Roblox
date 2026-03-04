@@ -66,6 +66,7 @@ def get_version_data(platform_key: str) -> dict:
     if "history" not in state: state["history"] = []
     if "last_update" not in state: state["last_update"] = state.get("current", "")
     if "last_build" not in state: state["last_build"] = ""
+    if "current" not in state: state["current"] = ""
     return state
 
 def update_version(platform_key: str, new_hash: str, is_official: bool = True, timestamp: Optional[str] = None) -> bool:
