@@ -24,7 +24,11 @@ load_dotenv()
 
 from config import DISCORD_BOT_TOKEN, DEVELOPERS, PLATFORMS, CHECK_INTERVAL, BOT_NAME, BOT_AVATAR_URL, UPDATE_BANNER_URL, BOT_VERSION
 from core.checker import fetch_all, VersionInfo
-from core.storage import get_version_data, update_version, get_all_guilds, get_guild_config, set_guild_config, get_all_announcement_channels, save_announcement, get_announcements
+from core.storage import (
+    get_version_data, update_version, backfill_history,
+    get_all_guilds, get_guild_config, set_guild_config,
+    get_all_announcement_channels, save_announcement, get_announcements
+)
 from core.notifier import build_update_embed, create_language_view
 from core.history import fetch_deploy_history, make_rdd_url
 from core.i18n import get_text
@@ -86,7 +90,15 @@ class BloxPulseBot(commands.Bot):
             activity=discord.Activity(type=discord.ActivityType.watching, name="Roblox Updates")
         )
         self.is_ready_flag = True
-        # Update dynamic status for all guilds on startup
+        # 1. Backfill history for Windows/Mac on startup
+        from core.history import fetch_deploy_history
+        import config
+        for plat in ["WindowsPlayer", "MacPlayer"]:
+            logger.info(f"BloxPulse: Backfilling history for {plat}...")
+            entries = fetch_deploy_history(plat, days=config.HISTORY_DAYS)
+            backfill_history(plat, entries)
+
+        # 2. Update dynamic status for all guilds on startup
         for guild in self.guilds:
             await update_dynamic_status(guild)
 
@@ -98,53 +110,6 @@ class BloxPulseBot(commands.Bot):
         """Update member count channel."""
         await update_dynamic_status(member.guild)
 
-    @tasks.loop(seconds=CHECK_INTERVAL)
-    async def monitor_task(self):
-        """Background loop to check for Roblox version changes."""
-        if not self.is_ready_flag: return
-        
-        loop = asyncio.get_event_loop()
-        try:
-            results = await loop.run_in_executor(None, fetch_all)
-            await update_api_health(results)
-            
-            for plat_key, vi in results.items():
-                if not vi: continue
-                
-                state = get_version_data(plat_key)
-                prev_hash = state.get("current", "")
-                
-                if prev_hash and prev_hash != vi.version_hash:
-                    # New version detected!
-                    logger.info(f"🆕 [{plat_key}] Version change: {prev_hash} -> {vi.version_hash}")
-                    
-                    # Store update
-                    update_version(plat_key, vi.version_hash)
-                    
-                    # Notify all configured guilds
-                    from core.notifier import build_update_embed, create_language_view
-                    guilds_data = get_all_guilds()
-                    for gid, config in guilds_data.items():
-                        alert_chan_id = config.get("channel_id")
-                        if not alert_chan_id: continue
-                        
-                        channel = self.get_channel(int(alert_chan_id))
-                        if not channel: continue
-                        
-                        lang = config.get("language", "en")
-                        embed = build_update_embed(plat_key, vi, prev_hash, lang, bot_icon=self.user.display_avatar.url)
-                        view = create_language_view(plat_key, vi, prev_hash, lang)
-                        
-                        role_id = config.get("ping_role_id")
-                        content = f"<@&{role_id}>" if role_id else None
-                        
-                        try:
-                            await channel.send(content=content, embed=embed, view=view)
-                        except Exception as e:
-                            logger.error(f"Failed to send alert to {gid}: {e}")
-
-        except Exception as e:
-            logger.error(f"Error in monitor_task: {e}", exc_info=True)
 
     @monitor_task.before_loop
     async def before_monitor(self):

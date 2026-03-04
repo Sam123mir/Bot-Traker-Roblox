@@ -68,7 +68,7 @@ def get_version_data(platform_key: str) -> dict:
     if "last_build" not in state: state["last_build"] = ""
     return state
 
-def update_version(platform_key: str, new_hash: str, is_official: bool = True) -> bool:
+def update_version(platform_key: str, new_hash: str, is_official: bool = True, timestamp: Optional[str] = None) -> bool:
     """
     Updates the version record. 
     If is_official=True, updates last_update.
@@ -80,9 +80,10 @@ def update_version(platform_key: str, new_hash: str, is_official: bool = True) -
     history   = state.get("history", [])
     timestamps: dict = state.get("timestamps", {})
 
-    # Record timestamp for new hash when first seen
+    # Record timestamp for new hash
+    final_ts = timestamp or _now_str()
     if new_hash not in timestamps:
-        timestamps[new_hash] = _now_str()
+        timestamps[new_hash] = final_ts
 
     # Add to history if unique
     if new_hash not in history:
@@ -98,6 +99,44 @@ def update_version(platform_key: str, new_hash: str, is_official: bool = True) -
     state["timestamps"] = timestamps
     full_data[platform_key] = state
     return _save_json(VERSIONS_FILE, full_data)
+
+def backfill_history(platform_key: str, entries: list[dict]):
+    """
+    Populates the database with historical entries.
+    entries: list of {"version_hash": str, "version": str, "timestamp": datetime}
+    """
+    if not entries:
+        return
+    
+    full_data = _load_json(VERSIONS_FILE)
+    state     = get_version_data(platform_key)
+    history   = state.get("history", [])
+    timestamps: dict = state.get("timestamps", {})
+    
+    changed = False
+    # Sort entries by timestamp ascending to insert newest last (so newest ends up at index 0)
+    sorted_entries = sorted(entries, key=lambda x: x["timestamp"])
+    
+    for entry in sorted_entries:
+        h = entry["version_hash"]
+        ts_str = entry["timestamp"].strftime("%Y-%m-%d %H:%M UTC")
+        
+        if h not in history:
+            history.insert(0, h)
+            timestamps[h] = ts_str
+            changed = True
+    
+    if changed:
+        state["history"] = history
+        state["timestamps"] = timestamps
+        # If current is empty, set it to the newest one
+        if not state.get("current") and history:
+            state["current"] = history[0]
+            state["last_update"] = history[0]
+            
+        full_data[platform_key] = state
+        _save_json(VERSIONS_FILE, full_data)
+        logger.info("Backfilled %d versions for %s", len(entries), platform_key)
 
 # ── Guild Configuration ───────────────────────────────────────
 

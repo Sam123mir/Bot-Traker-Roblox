@@ -12,8 +12,8 @@ HEARTBEAT_EVERY  = 3600   # Segundos entre logs de "sigo vivo" (1 hora)
 REQUEST_TIMEOUT  = 10     # Timeout por petición HTTP
 RETRY_ATTEMPTS   = 3      # Reintentos ante fallo de red
 RETRY_DELAY      = 5      # Segundos entre reintentos
-HISTORY_DAYS     = 7      # Días de historial a mostrar en /version
-HISTORY_MAX      = 25     # Máximo de entradas en dropdown de Discord
+HISTORY_DAYS     = 30     # Días de historial a mostrar en /version
+HISTORY_MAX      = 50     # Máximo de entradas en dropdown de Discord
 
 # ── Almacenamiento ────────────────────────────────────────────
 VERSIONS_FILE  = _os.path.join(_BASE, "data", "versions.json")
@@ -54,7 +54,7 @@ PLATFORMS: dict = {
 }
 
 # ── Branding ──────────────────────────────────────────────────
-BOT_VERSION    = "v1.9.3"
+BOT_VERSION    = "v1.9.4"
 BOT_NAME       = "BloxPulse · Roblox Monitor"
 BOT_AVATAR_URL = "https://cdn-icons-png.flaticon.com/512/8157/8157523.png"
 ROBLOX_ICON    = "https://cdn-icons-png.flaticon.com/512/18868/18868601.png"
