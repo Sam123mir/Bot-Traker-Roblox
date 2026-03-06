@@ -136,15 +136,15 @@ class BloxPulseBot(commands.Bot):
         if target:
             inviter_mention = f" {inviter.mention}" if inviter else ""
             embed = discord.Embed(
-                title="⚔︎ Welcome to BloxPulse | Roblox Monitoring",
+                title="✨ Welcome to BloxPulse | Roblox Monitoring",
                 description=(
                     f"Hello{inviter_mention}! Thank you for trusting **BloxPulse** to stay on top of Roblox deployments.\n\n"
-                    "🔒 **Security & Privacy**\n"
+                    "⬢ **Security & Privacy**\n"
                     "We are a bot focused exclusively on technical data. We do NOT require Administrator permissions or access to personal server data.\n\n"
-                    "🚀 **Quick Start Guide**\n"
+                    "✨ **Quick Start Guide**\n"
                     "To activate monitoring, use the following commands:\n"
-                    "• `/setup alerts` — Set the channel to receive version alerts.\n"
-                    "• `/setup announcements` — Receive important news about bot infrastructure.\n\n"
+                    "↳ `/setup alerts` — Set the channel to receive version alerts.\n"
+                    "↳ `/setup announcements` — Receive important news about bot infrastructure.\n\n"
                     "Use `/help` to explore all capabilities."
                 ),
                 color=0x00D1FF, # Professional Cyan
@@ -258,7 +258,7 @@ bot = BloxPulseBot()
 # ── ANNOUNCEMENT MODAL ───────────────────────────────────────
 # ═══════════════════════════════════════════════════════════════
 
-class AnnouncementModal(discord.ui.Modal, title='🚀 Create BloxPulse Update'):
+class AnnouncementModal(discord.ui.Modal, title='✨ Create BloxPulse Update'):
     ann_title = discord.ui.TextInput(
         label='Update Title',
         placeholder='e.g., BloxPulse v1.7: Premium Preview Stage',
@@ -318,8 +318,8 @@ class AnnouncementModal(discord.ui.Modal, title='🚀 Create BloxPulse Update'):
         
         from config import OFFICIAL_SERVER_URL
         embed.add_field(
-            name="🔗 Enlaces rápidos", 
-            value=f"**[Comunidad oficial]({OFFICIAL_SERVER_URL})** | **[Invitación de bot](https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=8&scope=bot%20applications.commands)**",
+            name="⬢ Enlaces rápidos", 
+            value=f"**[Comunidad oficial]({OFFICIAL_SERVER_URL})** | **[Invitación de bot](https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=380288&scope=bot%20applications.commands)**",
             inline=False
         )
         
@@ -342,7 +342,7 @@ class AnnouncementModal(discord.ui.Modal, title='🚀 Create BloxPulse Update'):
         # Show the preview view
         view = AnnouncementReviewView(embed, self.ann_data)
         await interaction.response.send_message(
-            content="🔍 **Live Preview**: This is how the update will look. Check for typos!",
+            content="⬢ **Live Preview**: This is how the update will look. Check for typos!",
             embed=embed, 
             view=view, 
             ephemeral=True
@@ -366,8 +366,8 @@ def build_announcement_embed(ann_data: dict) -> discord.Embed:
     
     from config import OFFICIAL_SERVER_URL
     embed.add_field(
-        name="🔗 Quick Links", 
-        value=f"**[Official Community]({OFFICIAL_SERVER_URL})** | **[Bot Invitation](https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=380160&scope=bot%20applications.commands)**",
+        name="⬢ Quick Links", 
+        value=f"**[Official Community]({OFFICIAL_SERVER_URL})** | **[Bot Invitation](https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=380288&scope=bot%20applications.commands)**",
         inline=False
     )
     
@@ -385,7 +385,7 @@ class AnnouncementReviewView(discord.ui.View):
         self.embed = embed
         self.ann_data = ann_data
 
-    @discord.ui.button(label="🚀 Send Broadcast", style=discord.ButtonStyle.success, emoji="🌍")
+    @discord.ui.button(label="✨ Send Broadcast", style=discord.ButtonStyle.success, emoji=None)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
         
@@ -415,14 +415,14 @@ class AnnouncementReviewView(discord.ui.View):
                     failed += 1
         
         await interaction.followup.send(
-            f"✅ **Broadcast Complete!**\nSent to `{count}` servers.\nFailed in `{failed}` servers.",
+            f"✨ **Broadcast Complete!**\nSent to `{count}` servers.\nFailed in `{failed}` servers.",
             ephemeral=True
         )
         self.stop()
 
-    @discord.ui.button(label="🗑️ Cancel", style=discord.ButtonStyle.danger, emoji="❌")
+    @discord.ui.button(label="⬢ Cancel", style=discord.ButtonStyle.danger, emoji=None)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("❌ Broadcast cancelled. Nothing was sent.", ephemeral=True)
+        await interaction.response.send_message("⚠ Broadcast cancelled. Nothing was sent.", ephemeral=True)
         for item in self.children:
             item.disabled = True
         await interaction.edit_original_response(view=self)
@@ -438,8 +438,8 @@ class DonationView(discord.ui.View):
         self.add_item(discord.ui.Button(
             label="Paypal: Cuentadepruebas750@gmail.com",
             style=discord.ButtonStyle.link,
-            url="https://www.paypal.com/paypalme/Cuentadepruebas750", # Note: User provided email, typically we'd use a link
-            emoji="💳"
+            url="https://www.paypal.com/paypalme/Cuentadepruebas750", 
+            emoji=None
         ))
 
 # ── UI Helpers ────────────────────────────────────────────────
@@ -468,10 +468,10 @@ async def premium_response(
         embed.set_thumbnail(url=thumbnail)
     
     footers = [
-        "BloxPulse Monitor 📡",
-        "Global Roblox Tracker 🌍",
-        "Monitoring with Pulse 🟢",
-        "Stay updated, stay fast 🚀",
+        "BloxPulse Monitor ⬢",
+        "Global Roblox Tracker ⬢",
+        "Monitoring with Pulse ✨",
+        "Stay updated, stay fast ✨",
         "Professional Monitoring ◈ BloxPulse"
     ]
     avatar_url = bot.user.display_avatar.url if bot.user else BOT_AVATAR_URL
@@ -534,7 +534,7 @@ class VersionHistorySelect(discord.ui.Select):
                 label=label[:100],
                 value=e["version_hash"],
                 description=f"Hash: {short}",
-                emoji="🏷️",
+                emoji=None,
             ))
         super().__init__(
             placeholder="Select a version to inspect...",
@@ -562,11 +562,11 @@ class VersionHistorySelect(discord.ui.Select):
             color=color,
             timestamp=datetime.now(timezone.utc),
         )
-        embed.add_field(name="🏷️ Version",     value=f"`{entry['version']}`",  inline=True)
-        embed.add_field(name="🔑 Build Hash",   value=f"`{short}`",             inline=True)
-        embed.add_field(name="📅 Deployed",     value=ts_discord,               inline=False)
+        embed.add_field(name="𖤘 Version",     value=f"`{entry['version']}`",  inline=True)
+        embed.add_field(name="⚿ Build Hash",   value=f"`{short}`",             inline=True)
+        embed.add_field(name="⬢ Deployed",     value=ts_discord,               inline=False)
         if rdd_url:
-            embed.add_field(name="⬇️ Download",  value=f"[◈ Download via RDD]({rdd_url})", inline=False)
+            embed.add_field(name="↳ Download",  value=f"[◈ Download via RDD]({rdd_url})", inline=False)
         avatar_url = bot.user.display_avatar.url if bot.user else BOT_AVATAR_URL
         embed.set_thumbnail(url=plat.get("icon_url", avatar_url))
         embed.set_footer(text="BloxPulse Monitor", icon_url=avatar_url)
@@ -1097,11 +1097,11 @@ class SetupConfirmView(discord.ui.View):
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(content="⏳ Applying changes, please wait...", embed=None, view=None)
         await deploy_template(interaction.guild)
-        await interaction.followup.send("✅ **Server configured successfully!** The professional structure has been deployed.", ephemeral=True)
+        await interaction.followup.send("✨ **Server configured successfully!** The professional structure has been deployed.", ephemeral=True)
 
-    @discord.ui.button(label="🗑️ Cancel", style=discord.ButtonStyle.red)
+    @discord.ui.button(label="⬢ Cancel", style=discord.ButtonStyle.red)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(content="❌ Setup cancelled.", embed=None, view=None)
+        await interaction.response.edit_message(content="⚠ Setup cancelled.", embed=None, view=None)
 
 async def deploy_template(guild: discord.Guild):
     # Cleanup: Delete previous BloxPulse channels and roles
@@ -1119,10 +1119,10 @@ async def deploy_template(guild: discord.Guild):
 
     # Roles creation
     roles_data = [
-        {"name": "♕ 》BloxPulse Owner",   "color": discord.Color.gold(),   "perm": discord.Permissions.all()},
-        {"name": "♖ 》BloxPulse Staff",   "color": discord.Color.blue(),   "perm": discord.Permissions(manage_messages=True, kick_members=True, mute_members=True)},
-        {"name": "♙ 》Verified Member", "color": discord.Color.light_grey(), "perm": discord.Permissions.none()},
-        {"name": "✱ 》Ping Version Roblox", "color": discord.Color.red(), "perm": discord.Permissions.none(), "mention": True},
+        {"name": "⬢ BloxPulse Owner",   "color": discord.Color.gold(),   "perm": discord.Permissions.all()},
+        {"name": "⬢ BloxPulse Staff",   "color": discord.Color.blue(),   "perm": discord.Permissions(manage_messages=True, kick_members=True, mute_members=True)},
+        {"name": "⬢ Verified Member", "color": discord.Color.light_grey(), "perm": discord.Permissions.none()},
+        {"name": "⬢ Ping Version Roblox", "color": discord.Color.red(), "perm": discord.Permissions.none(), "mention": True},
     ]
     
     for r_info in roles_data:
@@ -1136,29 +1136,29 @@ async def deploy_template(guild: discord.Guild):
 
     # Categories and Channels structure
     structure = [
-        ("┇═════ STATUS ═════┇", [
-            ("❱ Members: 0", discord.ChannelType.voice),
-            (f"❱ Bot Version: {BOT_VERSION}", discord.ChannelType.voice)
+        ("⬢ STATUS", [
+            ("⬢ Members: 0", discord.ChannelType.voice),
+            (f"⬢ Bot Version: {BOT_VERSION}", discord.ChannelType.voice)
         ]),
-        ("┇═════ STATUS APIs ═════┇", [
-            ("❱ Windows: 🟢", discord.ChannelType.voice),
-            ("❱ Mac: 🟢", discord.ChannelType.voice),
-            ("❱ Android: 🟢", discord.ChannelType.voice),
-            ("❱ iOS: 🟢", discord.ChannelType.voice)
+        ("⬢ STATUS APIs", [
+            ("⬢ Windows: Online", discord.ChannelType.voice),
+            ("⬢ Mac: Online", discord.ChannelType.voice),
+            ("⬢ Android: Online", discord.ChannelType.voice),
+            ("⬢ iOS: Online", discord.ChannelType.voice)
         ]),
-        ("┇═════ INFO ═════┇", [
-            ("❱ rules", discord.ChannelType.text),
-            ("❱ announcements", discord.ChannelType.text),
-            ("❱ official", discord.ChannelType.text)
+        ("⬢ INFO", [
+            ("⬢ rules", discord.ChannelType.text),
+            ("⬢ announcements", discord.ChannelType.text),
+            ("⬢ official", discord.ChannelType.text)
         ]),
-        ("┇═════ MONITOR ═════┇", [
-            ("❱ roblox-alerts", discord.ChannelType.text),
-            ("❱ stats", discord.ChannelType.text)
+        ("⬢ MONITOR", [
+            ("⬢ roblox-alerts", discord.ChannelType.text),
+            ("⬢ stats", discord.ChannelType.text)
         ]),
-        ("┇═════ COMMUNITY ═════┇", [
-            ("❱ general", discord.ChannelType.text),
-            ("❱ bug-reports", discord.ChannelType.text),
-            ("❱ suggestions", discord.ChannelType.text)
+        ("⬢ COMMUNITY", [
+            ("⬢ general", discord.ChannelType.text),
+            ("⬢ bug-reports", discord.ChannelType.text),
+            ("⬢ suggestions", discord.ChannelType.text)
         ])
     ]
 
@@ -1172,7 +1172,7 @@ async def deploy_template(guild: discord.Guild):
             if chan_type == discord.ChannelType.voice:
                 channel = await guild.create_voice_channel(chan_name, category=category, overwrites=overwrites)
                 if "Members" in chan_name:
-                    await channel.edit(name=f"❱ Members: {guild.member_count}")
+                    await channel.edit(name=f"⬢ Members: {guild.member_count}")
             else:
                 channel = await guild.create_text_channel(chan_name.replace(" ", "-"), category=category)
                 if "announcements" in chan_name:
@@ -1186,9 +1186,9 @@ async def deploy_template(guild: discord.Guild):
 
 async def update_member_count_channel(guild):
     for channel in guild.voice_channels:
-        if "❱ Members:" in channel.name:
+        if "Members:" in channel.name:
             try:
-                await channel.edit(name=f"❱ Members: {guild.member_count}")
+                await channel.edit(name=f"⬢ Members: {guild.member_count}")
             except: pass
 
 
@@ -1303,7 +1303,7 @@ async def updates_history(interaction: discord.Interaction):
     view = UpdatesHistoryView(history)
     
     await interaction.followup.send(
-        content="🔍 **BloxPulse Update History**",
+        content="⬢ **BloxPulse Update History**",
         embed=latest_embed,
         view=view,
         ephemeral=True
@@ -1320,7 +1320,7 @@ class UpdatesHistorySelect(discord.ui.Select):
                 label=f"{ann['title'][:50]}",
                 description=f"Version: {ann['version']} — {date_str}",
                 value=str(i),
-                emoji="🚀"
+                emoji=None
             ))
         super().__init__(placeholder="Switch to another update...", options=options)
         self.history = history
@@ -1344,12 +1344,12 @@ async def status(interaction: discord.Interaction):
     h, m, s = int(uptime // 3600), int((uptime % 3600) // 60), int(uptime % 60)
 
     fields = [
-        ("⏱️ Uptime",   f"`{h}h {m}m {s}s`",                 True),
-        ("🏠 Guilds",   f"`{len(bot.guilds)} servers`",        True),
+        ("⏱︎ Uptime",   f"`{h}h {m}m {s}s`",                 True),
+        ("⬢ Guilds",   f"`{len(bot.guilds)} servers`",        True),
         ("📶 Latency",  f"`{round(bot.latency * 1000)}ms`",    True),
-        ("🤖 Version",  f"`{BOT_VERSION} · Premium`",           True),
-        ("🔁 Interval", f"`{CHECK_INTERVAL}s cycles`",         True),
-        ("👑 Owner",    f"`{interaction.user.id}`",             True),
+        ("⬢ Version",  f"`{BOT_VERSION} · Premium`",           True),
+        ("⟳ Interval", f"`{CHECK_INTERVAL}s cycles`",         True),
+        ("♚ Owner",    f"`{interaction.user.id}`",             True),
     ]
     await premium_response(
         interaction,
@@ -1360,7 +1360,7 @@ async def status(interaction: discord.Interaction):
     )
 
 
-@bot.tree.command(name="config", description="⚙️ View current BloxPulse configuration for this server.")
+@bot.tree.command(name="config", description="⬢ View current BloxPulse configuration for this server.")
 @has_manage_guild()
 async def config_cmd(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
@@ -1369,26 +1369,26 @@ async def config_cmd(interaction: discord.Interaction):
     role_id   = cfg.get("ping_role_id")
     ann_id    = cfg.get("announcement_channel_id")
     lang      = cfg.get("language", "en")
-    lang_names = {"en": "English 🇺🇸", "es": "Español 🇪🇸", "pt": "Português 🇧🇷", "ru": "Русский 🇷🇺", "fr": "Français 🇫🇷"}
+    lang_names = {"en": "English (US)", "es": "Español (ES)", "pt": "Português (BR)", "ru": "Русский (RU)", "fr": "Français (FR)"}
 
     ch_str   = f"<#{ch_id}>" if ch_id else "`Not configured`"
     role_str = f"<@&{role_id}>" if role_id else "`None`"
     ann_str  = f"<#{ann_id}>" if ann_id else "`Not set`"
 
     desc = (
-        f"● **Alerts Channel**: {ch_str}\n"
-        f"● **Ping Role**: {role_str}\n"
-        f"● **Updates Channel**: {ann_str}\n"
-        f"● **Language**: {lang_names.get(lang, lang)}"
+        f"↳ **Alerts Channel**: {ch_str}\n"
+        f"↳ **Ping Role**: {role_str}\n"
+        f"↳ **Updates Channel**: {ann_str}\n"
+        f"↳ **Language**: {lang_names.get(lang, lang)}"
     )
     await premium_response(interaction, "Server Configuration", desc, color=0x3498DB)
 
 
-@bot.tree.command(name="donate", description="💖 Support BloxPulse development and hosting.")
+@bot.tree.command(name="donate", description="✨ Support BloxPulse development and hosting.")
 async def donate(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
     embed = discord.Embed(
-        title="💖 Support BloxPulse Development",
+        title="✨ Support BloxPulse Development",
         description=(
             "If you like **BloxPulse** and want to support its maintenance (servers and coffee ☕), "
             "you can do so via **PayPal**.\n\n"
@@ -1482,7 +1482,7 @@ async def reload(interaction: discord.Interaction):
             ephemeral=True,
         )
     except Exception as e:
-        await interaction.followup.send(f"❌ Cycle failed: `{e}`", ephemeral=True)
+        await interaction.followup.send(f"⚠ Cycle failed: `{e}`", ephemeral=True)
 
 
 @bot.tree.command(name="guilds", description="📂 List all servers using BloxPulse (Owner only).")
@@ -1544,17 +1544,17 @@ async def update_dynamic_status(guild: discord.Guild):
     if not guild or not hasattr(guild, "voice_channels"): return
     
     # 1. Update Member Count
-    member_channel = discord.utils.get(guild.voice_channels, name=lambda n: "❱ Members:" in n)
+    member_channel = discord.utils.get(guild.voice_channels, name=lambda n: "Members:" in n)
     if member_channel:
         try:
-            await member_channel.edit(name=f"❱ Members: {guild.member_count}")
+            await member_channel.edit(name=f"⬢ Members: {guild.member_count}")
         except: pass
 
     # 2. Update Bot Version
-    version_channel = discord.utils.get(guild.voice_channels, name=lambda n: "❱ Bot Version:" in n)
+    version_channel = discord.utils.get(guild.voice_channels, name=lambda n: "Bot Version:" in n)
     if version_channel:
         try:
-            await version_channel.edit(name=f"❱ Bot Version: {BOT_VERSION}")
+            await version_channel.edit(name=f"⬢ Bot Version: {BOT_VERSION}")
         except: pass
 
     # 3. Update API Status Channels (Granular)
@@ -1566,11 +1566,11 @@ async def update_dynamic_status(guild: discord.Guild):
     }
     
     for platform, is_online in status_map.items():
-        emoji = "🟢" if is_online else "🔴"
-        new_name = f"❱ {platform}: {emoji}"
+        status_text = "Online" if is_online else "Offline"
+        new_name = f"⬢ {platform}: {status_text}"
         
         # Find exact channel by prefix
-        chan = discord.utils.get(guild.voice_channels, name=lambda n: f"❱ {platform}:" in n)
+        chan = discord.utils.get(guild.voice_channels, name=lambda n: f"⬢ {platform}:" in n or f"❱ {platform}:" in n)
         if chan:
             try:
                 if chan.name != new_name:

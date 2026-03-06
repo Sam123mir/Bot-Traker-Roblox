@@ -80,25 +80,26 @@ def build_update_embed(
     gap = "\u2800" * 6  # Spacing for dual column
 
     # Final "Side-by-Side" with '|' character style
-    if not _is_mobile(platform_key): # Assuming 'mobile' was meant to be _is_mobile(platform_key)
+    if not _is_mobile(platform_key): 
+        # desktop: two columns
         data_block = (
-            f"🔖 **{t_ver}**{gap}{gap}📡 **{t_plat}**\n"
+            f"𖤘 **{t_ver}**{gap}{gap}⬢ **{t_plat}**\n"
             f"| `{d_version}`{gap}| **{label}**\n"
             f"\n"
-            f"🔑 **{t_hash}**{gap}{gap}📅 **Detected**\n"
+            f"⚿ **{t_hash}**{gap}{gap}🗓️ **Detected**\n"
             f"| `{d_short}`{gap}| `{dt_str}`\n"
             f"\n"
-            f"🌐 **Channel**\n"
+            f"⬢ **Channel**\n"
             f"| `{channel}`"
         )
     else:
-        # Mobile layout - compact with '|'
+        # mobile: list
         data_block = (
-            f"🔖 **{t_ver}**: | `{d_version}`\n"
-            f"📡 **{t_plat}**: | **{label}**\n"
-            f"🔑 **{t_hash}**: | `{d_short}`\n"
-            f"🌐 **Channel**: | `{channel}`\n"
-            f"📅 **Detected**: | `{dt_str}`"
+            f"𖤘 **{t_ver}**: | `{d_version}`\n"
+            f"⬢ **{t_plat}**: | **{label}**\n"
+            f"⚿ **{t_hash}**: | `{d_short}`\n"
+            f"⬢ **Channel**: | `{channel}`\n"
+            f"🗓️ **Detected**: | `{dt_str}`"
         )
     intro_tag = " — *Historical Build*" if is_historical else ""
     intro     = (
@@ -111,8 +112,8 @@ def build_update_embed(
     color = cfg["color"]
     
     if is_build:
-        title = f"⚠️ Build Detected on {label}!"
-        color = 0xF1C40F # Warning Yellow for pre-release
+        title = f"◈ Build Detected on {label}!"
+        color = 0xF1C40F # Warning Yellow
         description = (
             f"**{label} has just built a new version!**\n"
             f"**THIS IS NOT A ROBLOX UPDATE**\n\n"
@@ -143,19 +144,19 @@ def build_update_embed(
         
         comp_text = ""
         if key_items:
-            comp_text += "**Principales:**\n" + "\n".join([f"• `{c}`" for c in key_items]) + "\n"
+            comp_text += "**Principales:**\n" + "\n".join([f"↳ `{c}`" for c in key_items]) + "\n"
         
         if other_zips:
             comp_text += f"\n**Otros:** `{len(other_zips)}` archivos .zip detectados."
             
-        embed.add_field(name="📦 Componentes del Despliegue", value=comp_text or "No se detectaron archivos individuales.", inline=False)
+        embed.add_field(name="⬢ Componentes del Despliegue", value=comp_text or "No se detectaron archivos.", inline=False)
 
     if history_data:
         history_text = ""
         for item in history_data:
             h_short = item["hash"].replace("version-", "")
-            history_text += f"• `{h_short}` — {item['date']}\n"
-        embed.add_field(name="📜 Recent History", value=history_text or "No history", inline=False)
+            history_text += f"↳ `{h_short}` — {item['date']}\n"
+        embed.add_field(name="⬢ Recent History", value=history_text or "No history", inline=False)
 
     embed.add_field(
         name=f"*{t_dl_h}*",
