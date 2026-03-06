@@ -138,7 +138,10 @@ def backfill_history(platform_key: str, entries: list[dict]):
         _save_json(VERSIONS_FILE, full_data)
         logger.info("Backfilled %d versions for %s", len(entries), platform_key)
 
-# ── Guild Configuration ───────────────────────────────────────
+def get_all_guilds() -> List[int]:
+    """Returns a list of all guild IDs that have a stored configuration."""
+    data = _load_json(GUILDS_FILE)
+    return [int(gid) for gid in data.keys()]
 
 def get_guild_config(guild_id: int) -> dict:
     data = _load_json(GUILDS_FILE)

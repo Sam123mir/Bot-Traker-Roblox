@@ -64,6 +64,7 @@ class BloxPulseBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
         intents.message_content = True
+        intents.members = True
         super().__init__(
             command_prefix="!",
             intents=intents,
@@ -94,9 +95,13 @@ class BloxPulseBot(commands.Bot):
             entries = fetch_deploy_history(plat, days=config.HISTORY_DAYS)
             backfill_history(plat, entries)
 
-        # 2. Update dynamic status for all guilds on startup
+        # 2. Update dynamic status for all guilds and check for new ones
+        configured_guilds = get_all_guilds()
         for guild in self.guilds:
             await update_dynamic_status(guild)
+            # If guild is not in our database, it's "new" (maybe joined while bot was off)
+            if guild.id not in configured_guilds:
+                await self.on_guild_join(guild)
 
     async def on_member_join(self, member: discord.Member):
         """Update member count channel."""
@@ -131,7 +136,7 @@ class BloxPulseBot(commands.Bot):
         if target:
             inviter_mention = f" {inviter.mention}" if inviter else ""
             embed = discord.Embed(
-                title="✨ Welcome to BloxPulse | Roblox Monitoring",
+                title="⚔︎ Welcome to BloxPulse | Roblox Monitoring",
                 description=(
                     f"Hello{inviter_mention}! Thank you for trusting **BloxPulse** to stay on top of Roblox deployments.\n\n"
                     "🔒 **Security & Privacy**\n"
@@ -785,10 +790,10 @@ async def version_cmd(interaction: discord.Interaction, platform: str):
 @bot.tree.command(name="download", description="Get the download link for the current Roblox version.")
 @app_commands.describe(platform="Platform to download")
 @app_commands.choices(platform=[
-    app_commands.Choice(name="🪟 Windows", value="windows"),
-    app_commands.Choice(name="🍎 macOS",   value="mac"),
-    app_commands.Choice(name="🤖 Android", value="android"),
-    app_commands.Choice(name="📱 iOS",     value="ios"),
+    app_commands.Choice(name="⬢ Windows", value="windows"),
+    app_commands.Choice(name="⬢ macOS",   value="mac"),
+    app_commands.Choice(name="⬢ Android", value="android"),
+    app_commands.Choice(name="⬢ iOS",     value="ios"),
 ])
 async def download(interaction: discord.Interaction, platform: str):
     await interaction.response.defer(ephemeral=True)
@@ -810,27 +815,27 @@ async def download(interaction: discord.Interaction, platform: str):
 
     if vi:
         short = vi.version_hash.replace("version-", "")
-        embed.add_field(name="🏷️ Version",   value=f"`{vi.version}`",  inline=True)
-        embed.add_field(name="🔑 Build Hash", value=f"`{short[:16]}…`", inline=True)
+        embed.add_field(name="𖤘 Version",   value=f"`{vi.version}`",  inline=True)
+        embed.add_field(name="⚿ Build Hash", value=f"`{short[:16]}…`", inline=True)
         embed.add_field(name="\u200b",        value="\u200b",            inline=True)
 
         rdd_url = make_rdd_url(platform_key, vi.version_hash)
         if rdd_url:
             embed.add_field(
-                name="⬇️ Download Link",
-                value=f"**[◈ Download {label} via RDD]({rdd_url})**\n*Links directly from Roblox's CDN*",
+                name="↳ Download Link",
+                value=f"**[➥ Download {label} via RDD]({rdd_url})**\n*Links directly from Roblox's CDN*",
                 inline=False,
             )
         elif platform == "android":
             embed.add_field(
-                name="⬇️ Google Play Store",
-                value="**[◈ Open on Google Play](https://play.google.com/store/apps/details?id=com.roblox.client)**",
+                name="↳ Google Play Store",
+                value="**[➥ Open on Google Play](https://play.google.com/store/apps/details?id=com.roblox.client)**",
                 inline=False,
             )
         elif platform == "ios":
             embed.add_field(
-                name="⬇️ App Store",
-                value="**[◈ Open on App Store](https://apps.apple.com/app/roblox/id431946152)**",
+                name="↳ App Store",
+                value="**[➥ Open on App Store](https://apps.apple.com/app/roblox/id431946152)**",
                 inline=False,
             )
     else:
@@ -843,8 +848,8 @@ async def download(interaction: discord.Interaction, platform: str):
 @bot.tree.command(name="compare", description="Compare the current Roblox version with an older one.")
 @app_commands.describe(platform="Platform to compare versions for")
 @app_commands.choices(platform=[
-    app_commands.Choice(name="🪟 Windows", value="windows"),
-    app_commands.Choice(name="🍎 macOS",   value="mac"),
+    app_commands.Choice(name="⬢ Windows", value="windows"),
+    app_commands.Choice(name="⬢ macOS",   value="mac"),
 ])
 async def compare(interaction: discord.Interaction, platform: str):
     await interaction.response.defer()
@@ -941,31 +946,33 @@ async def ping_cmd(interaction: discord.Interaction):
     )
     embed.add_field(name=f"{ws_indicator} Discord Latency", value=f"`{ws_latency} ms` {get_bar(ws_latency)}", inline=True)
     embed.add_field(name=f"{rbl_indicator} Roblox API",    value=f"`{http_ms if http_ms >= 0 else 'Timeout'} ms` {get_bar(http_ms)}", inline=True)
-    embed.add_field(name="⏱️ Uptime",               value=f"`{h}h {m}m {s}s`", inline=True)
-    embed.add_field(name="🔁 Monitoring Cycle",          value=f"`{CHECK_INTERVAL}s`", inline=True)
+    embed.add_field(name="⏱︎ Uptime",               value=f"`{h}h {m}m {s}s`", inline=True)
+    embed.add_field(name="⟳ Monitoring Cycle",          value=f"`{CHECK_INTERVAL}s`", inline=True)
     
     embed.set_footer(text=f"BloxPulse {BOT_VERSION} · {random.choice(['Stable', 'Operational', 'Online'])}", icon_url=bot.user.display_avatar.url if bot.user else BOT_AVATAR_URL)
     await interaction.followup.send(embed=embed, ephemeral=True)
 
 
-@bot.tree.command(name="info", description="ℹ️ Learn more about BloxPulse and its developers.")
+@bot.tree.command(name="info", description="ⓘ Learn more about BloxPulse and its developers.")
 async def info_cmd(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
     embed = discord.Embed(
-        title="◈ BloxPulse Project",
+        title="✎ BloxPulse Project",
         description=(
             "**BloxPulse** is a global monitoring system for Roblox, "
             "designed to deliver precise and fast data on platform updates.\n\n"
-            "**👑 Owner/Dev:** <@1420085090570207313>\n"
-            "**🛠️ Tech Stack:** Python, discord.py, Flask, Docker.\n"
-            "**🌎 Scope:** Global (Windows, Mac, Android, iOS).\n\n"
+            "**♚ Owner/Dev:** <@1420085090570207313>\n"
+            "**⚒︎ Tech Stack:** Python, discord.py, Flask, Docker.\n"
+            "**ᯓ ✈︎ Scope:** Global (Windows, Mac, Android, iOS).\n\n"
             "If you like the project, consider using `/donate` to support us."
         ),
         color=0x5865F2,
         timestamp=datetime.now(timezone.utc)
     )
-    embed.set_thumbnail(url=bot.user.display_avatar.url if bot.user else BOT_AVATAR_URL)
-    embed.set_image(url="https://images-ext-1.discordapp.net/external/E-hF_N79Uv0z_Jj_UoX4B2j7j0J6Y3tF6e7f_n7_j0/https/media.giphy.com/media/v1.Y2lkPTc5MGI3NjExM2I1YzM0ZGQzYjU0Y2EyZTM1ZTM1ZTM1ZTM1ZTM1ZTM1ZTM1ZTM1JmVwPXYxX2ludGVybmFsX2dpZl9ieV9pZCZjdD1n/3o7TKMGpxS7tHjN0_y/giphy.gif") # Nice aesthetic pulse gif
-    await interaction.response.send_message(embed=embed)
+    avatar_url = bot.user.display_avatar.url if bot.user else BOT_AVATAR_URL
+    embed.set_thumbnail(url=avatar_url)
+    embed.set_footer(text="BloxPulse · Innovation & Transparency", icon_url=avatar_url)
+    await interaction.followup.send(embed=embed)
 
 
 @bot.tree.command(name="platforms", description="List all monitored platforms and their status.")
@@ -1003,8 +1010,8 @@ async def myid(interaction: discord.Interaction):
 async def invite(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
     lang = get_guild_config(interaction.guild_id).get("language", "en")
-    # Permissions: Send Messages, Embed Links, Attach Files, Use External Emojis, Add Reactions, Read History, View Channels (380160)
-    invite_url = f"https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=380160&scope=bot%20applications.commands"
+    # Permissions: Send Messages, Embed Links, Attach Files, Use External Emojis, Add Reactions, Read History, View Channels, View Audit Log (380288)
+    invite_url = f"https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=380288&scope=bot%20applications.commands"
     
     embed = discord.Embed(
         title="🚀 Take Monitoring to the Next Level!",
@@ -1014,7 +1021,7 @@ async def invite(interaction: discord.Interaction):
             "• **No Admin Required**: We only ask for essential permissions to function.\n"
             "• **Total Privacy**: We don't read your messages; we only monitor the Roblox API.\n"
             "• **Performance**: Optimized to not cause lag in your server.\n\n"
-            "✅ **Premium Features**\n"
+            "☑ **Premium Features**\n"
             "• Instant alerts for Windows, Mac, iOS, and Android.\n"
             "• Detailed history and direct download links.\n"
             "• Automatic multi-language support (English by default)."
@@ -1191,38 +1198,12 @@ async def help_cmd(interaction: discord.Interaction):
     lang = get_guild_config(interaction.guild_id).get("language", "en")
     
     embed = discord.Embed(
-        title=get_text(lang, "help_title"),
-        description=get_text(lang, "help_desc"),
+        title="✨ BloxPulse | Command Guide",
+        description=(
+            "Welcome to **BloxPulse**. Use these commands to monitor Roblox deployments in real-time.\n\u200b"
+        ),
         color=0x5865F2,
         timestamp=datetime.now(timezone.utc),
-    )
-    embed.add_field(
-        name=get_text(lang, "user_cmds"),
-        value=(
-            "`/check` — Live platform versions\n"
-            "`/version` — History dropdown (last 7 days)\n"
-            "`/download` — Get download link for current version\n"
-            "`/compare` — Compare current vs. older version\n"
-            "`/platforms` — All tracked platforms\n"
-            "`/ping` — Bot & API latency\n"
-            "`/donate` — Support BloxPulse development 💖\n"
-            "`/invite` — Add BloxPulse to your server 🚀\n"
-            "`/info` — Project details & credits ℹ️\n"
-            "`/myid` — Your Discord ID\n"
-            "`/help` — This menu"
-        ),
-        inline=False,
-    )
-    embed.add_field(
-        name=get_text(lang, "admin_cmds"),
-        value=(
-            "`/setup alerts` — Configure alert channel\n"
-            "`/setup announcements` — Configure news channel\n"
-            "`/setup_server` — Create pro server template 🏗️\n"
-            "`/language` — Set server language\n"
-            "`/config` — View current server config"
-        ),
-        inline=False,
     )
     embed.add_field(
         name=get_text(lang, "owner_cmds"),
