@@ -65,6 +65,9 @@ class BloxPulseBot(commands.Bot):
         intents = discord.Intents.default()
         intents.message_content = True
         intents.members = True
+        # Prevent duplicate welcomes in same session
+        self.welcomed_guilds = set()
+        
         super().__init__(
             command_prefix="!",
             intents=intents,
@@ -99,8 +102,9 @@ class BloxPulseBot(commands.Bot):
         configured_guilds = get_all_guilds()
         for guild in self.guilds:
             await update_dynamic_status(guild)
-            # If guild is not in our database, it's "new" (maybe joined while bot was off)
-            if guild.id not in configured_guilds:
+            # If guild is not in our database and not welcomed this session
+            if guild.id not in configured_guilds and guild.id not in self.welcomed_guilds:
+                logger.info(f"BloxPulse: Startup check — New guild detected: {guild.name}")
                 await self.on_guild_join(guild)
 
     async def on_member_join(self, member: discord.Member):
@@ -113,13 +117,17 @@ class BloxPulseBot(commands.Bot):
 
     async def on_guild_join(self, guild: discord.Guild):
         """Welcome message and setup prompt with inviter detection."""
-        logger.info(f"BloxPulse: Joined new guild: {guild.name} ({guild.id})")
+        if guild.id in self.welcomed_guilds:
+            return
+        self.welcomed_guilds.add(guild.id)
+        
+        logger.info(f"BloxPulse: Processing welcome for guild: {guild.name} ({guild.id})")
         
         # 1. Try to find who invited the bot (Audit Logs)
         inviter = None
         if guild.me.guild_permissions.view_audit_log:
             try:
-                async for entry in guild.audit_logs(limit=3, action=discord.AuditLogAction.bot_add):
+                async for entry in guild.audit_logs(limit=5, action=discord.AuditLogAction.bot_add):
                     if entry.target.id == self.user.id:
                         inviter = entry.user
                         break
@@ -127,13 +135,28 @@ class BloxPulseBot(commands.Bot):
                 logger.debug(f"Could not fetch audit logs in {guild.name}: {e}")
 
         # 2. Select the best channel to send the message
-        # Priority: System Channel > General/Text Channel with permissions
-        target = guild.system_channel
-        if not target or not target.permissions_for(guild.me).send_messages:
-            # Fallback to the first available text channel
+        # Priority: Common names > System Channel > Any text channel
+        priority_names = ["general", "chat", "welcome", "bienvenida", "principal", "inicio", "lobby", "main"]
+        target = None
+        
+        # Search by priority names FIRST
+        for name in priority_names:
+            target = discord.utils.get(guild.text_channels, name=lambda n: name in n.lower())
+            if target and target.permissions_for(guild.me).send_messages and target.permissions_for(guild.me).embed_links:
+                break
+        
+        # Fallback to system channel
+        if not target:
+            target = guild.system_channel
+            if not (target and target.permissions_for(guild.me).send_messages and target.permissions_for(guild.me).embed_links):
+                target = None
+        
+        # Final fallback: any text channel
+        if not target:
             target = next((c for c in guild.text_channels if c.permissions_for(guild.me).send_messages and c.permissions_for(guild.me).embed_links), None)
 
         if target:
+            logger.info(f"BloxPulse: Selected welcome channel: #{target.name} ({target.id}) in {guild.name}")
             inviter_mention = f" {inviter.mention}" if inviter else ""
             embed = discord.Embed(
                 title="✨ Welcome to BloxPulse | Roblox Monitoring",
@@ -158,9 +181,11 @@ class BloxPulseBot(commands.Bot):
             
             try:
                 await target.send(embed=embed)
-                logger.info(f"Sent welcome message to {guild.name}")
+                logger.info(f"BloxPulse: Welcome message SENT successfully to #{target.name}")
             except Exception as e:
-                logger.warning(f"Failed to send welcome message in {guild.name}: {e}")
+                logger.warning(f"BloxPulse: FAILED to send welcome message to #{target.name}: {e}")
+        else:
+            logger.warning(f"BloxPulse: NO suitable channel found in {guild.name} to send welcome message.")
 
 
     @tasks.loop(seconds=CHECK_INTERVAL)
@@ -1475,17 +1500,17 @@ async def reload(interaction: discord.Interaction):
         await interaction.followup.send(
             embed=discord.Embed(
                 title="◈ Monitoring Cycle Forced",
-                description=f"✅ Fetched data for: `{platform_list}`\nAll changes will be broadcast if detected.",
+                description=f"⬢ Fetched data for: `{platform_list}`\nAll changes will be broadcast if detected.",
                 color=0x27AE60,
                 timestamp=datetime.now(timezone.utc),
             ).set_footer(text="BloxPulse Monitor", icon_url=bot.user.display_avatar.url),
             ephemeral=True,
         )
     except Exception as e:
-        await interaction.followup.send(f"⚠ Cycle failed: `{e}`", ephemeral=True)
+        await interaction.followup.send(f"◈ Cycle failed: `{e}`", ephemeral=True)
 
 
-@bot.tree.command(name="guilds", description="📂 List all servers using BloxPulse (Owner only).")
+@bot.tree.command(name="guilds", description="⬢ List all servers using BloxPulse (Owner only).")
 @is_owner()
 async def guilds(interaction: discord.Interaction):
     guild_lines = []
