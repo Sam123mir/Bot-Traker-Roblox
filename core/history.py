@@ -30,14 +30,15 @@ _DEPLOY_HISTORY_URLS = {
 _TYPE_LABELS = {
     "WindowsPlayer":   "WindowsPlayer",
     "WindowsStudio64": "Studio64",
-    "MacPlayer":       "MacPlayer",
-    "MacStudio":       "MacStudio",
+    "MacPlayer":       "Client",
+    "MacStudio":       "Studio",
 }
 
 # Regex: "New WindowsPlayer version-abc123 at 3/2/2026 5:13:57 PM, file version: 0, 711, 0, 7110873, ..."
+# Flexible with spaces after commas for version numbers
 _LINE_RE = re.compile(
     r"New (\S+) (version-[0-9a-f]+) at (\d+/\d+/\d+ \d+:\d+:\d+ [AP]M)"
-    r".*?file version: (\d+), (\d+), (\d+), (\d+)"
+    r".*?file version:\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+)"
 )
 
 

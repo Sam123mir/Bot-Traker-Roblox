@@ -109,26 +109,36 @@ class BloxPulseBot(commands.Bot):
     async def on_guild_join(self, guild: discord.Guild):
         """Welcome message and setup prompt."""
         logger.info(f"BloxPulse: Joined new guild: {guild.name} ({guild.id})")
+        
         # Try to find a system channel or a general text channel
         target = guild.system_channel or next((c for c in guild.text_channels if c.permissions_for(guild.me).send_messages), None)
         if target:
             embed = discord.Embed(
-                title="✨ ¡Gracias por invitar a BloxPulse!",
+                title="✨ Bienvenido a BloxPulse | Roblox Monitoring",
                 description=(
-                    "Estoy listo para monitorear las versiones de Roblox por ti.\n\n"
-                    "**Configura el bot ahora:**\n"
-                    "🔹 **Alertas de Roblox**: `/setup alerts` (Recomendado)\n"
-                    "🔹 **Noticias de BloxPulse**: `/setup announcements` (Opcional)\n\n"
-                    "Usa `/help` para ver la lista completa de comandos."
+                    "Gracias por confiar en **BloxPulse** para mantenerte al tanto de los despliegues de Roblox.\n\n"
+                    "🔒 **Seguridad y Privacidad**\n"
+                    "Somos un bot enfocado exclusivamente en datos técnicos. No requerimos permisos de Administrador ni acceso a datos personales del servidor.\n\n"
+                    "🚀 **Guía de Inicio Rápido**\n"
+                    "Para activar el monitoreo, usa los siguientes comandos:\n"
+                    "• `/setup alerts` — Configura el canal para recibir alertas de nuevas versiones.\n"
+                    "• `/setup announcements` — Recibe noticias importantes sobre la infraestructura del bot.\n\n"
+                    "Usa `/help` para explorar todas las capacidades."
                 ),
-                color=0x00FFBB,
+                color=0x00D1FF, # Professional Cyan
                 timestamp=datetime.now(timezone.utc)
             )
-            avatar_url = self.user.display_avatar.url if self.user else bot.user.display_avatar.url if bot.user else BOT_AVATAR_URL
+            # Find a suitable icon (Logo or Bot Avatar)
+            avatar_url = self.user.display_avatar.url if self.user else BOT_AVATAR_URL
+            
             embed.set_thumbnail(url=avatar_url)
-            embed.set_footer(text="BloxPulse · Monitoring System", icon_url=avatar_url)
-            try: await target.send(embed=embed)
-            except: pass
+            embed.setImage(url="https://i.imgur.com/your-professional-banner.png") # Optional placeholder for a banner if user has one
+            embed.set_footer(text="Precisión · Velocidad · Transparencia", icon_url=avatar_url)
+            
+            try:
+                await target.send(embed=embed)
+            except Exception as e:
+                logger.warning(f"Failed to send welcome message in {guild.name}: {e}")
 
 
     @tasks.loop(seconds=CHECK_INTERVAL)
