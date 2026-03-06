@@ -107,16 +107,33 @@ class BloxPulseBot(commands.Bot):
         await update_dynamic_status(member.guild)
 
     async def on_guild_join(self, guild: discord.Guild):
-        """Welcome message and setup prompt."""
+        """Welcome message and setup prompt with inviter detection."""
         logger.info(f"BloxPulse: Joined new guild: {guild.name} ({guild.id})")
         
-        # Try to find a system channel or a general text channel
-        target = guild.system_channel or next((c for c in guild.text_channels if c.permissions_for(guild.me).send_messages), None)
+        # 1. Try to find who invited the bot (Audit Logs)
+        inviter = None
+        if guild.me.guild_permissions.view_audit_log:
+            try:
+                async for entry in guild.audit_logs(limit=3, action=discord.AuditLogAction.bot_add):
+                    if entry.target.id == self.user.id:
+                        inviter = entry.user
+                        break
+            except Exception as e:
+                logger.debug(f"Could not fetch audit logs in {guild.name}: {e}")
+
+        # 2. Select the best channel to send the message
+        # Priority: System Channel > General/Text Channel with permissions
+        target = guild.system_channel
+        if not target or not target.permissions_for(guild.me).send_messages:
+            # Fallback to the first available text channel
+            target = next((c for c in guild.text_channels if c.permissions_for(guild.me).send_messages and c.permissions_for(guild.me).embed_links), None)
+
         if target:
+            inviter_mention = f" {inviter.mention}" if inviter else ""
             embed = discord.Embed(
                 title="✨ Welcome to BloxPulse | Roblox Monitoring",
                 description=(
-                    "Thank you for trusting **BloxPulse** to stay on top of Roblox deployments.\n\n"
+                    f"Hello{inviter_mention}! Thank you for trusting **BloxPulse** to stay on top of Roblox deployments.\n\n"
                     "🔒 **Security & Privacy**\n"
                     "We are a bot focused exclusively on technical data. We do NOT require Administrator permissions or access to personal server data.\n\n"
                     "🚀 **Quick Start Guide**\n"
@@ -128,15 +145,15 @@ class BloxPulseBot(commands.Bot):
                 color=0x00D1FF, # Professional Cyan
                 timestamp=datetime.now(timezone.utc)
             )
-            # Find a suitable icon (Logo or Bot Avatar)
-            avatar_url = self.user.display_avatar.url if self.user else BOT_AVATAR_URL
             
+            avatar_url = self.user.display_avatar.url if self.user else BOT_AVATAR_URL
             embed.set_thumbnail(url=avatar_url)
-            embed.setImage(url=UPDATE_BANNER_URL)
+            embed.set_image(url=UPDATE_BANNER_URL)
             embed.set_footer(text="Precision · Speed · Transparency", icon_url=avatar_url)
             
             try:
                 await target.send(embed=embed)
+                logger.info(f"Sent welcome message to {guild.name}")
             except Exception as e:
                 logger.warning(f"Failed to send welcome message in {guild.name}: {e}")
 
@@ -984,6 +1001,7 @@ async def myid(interaction: discord.Interaction):
 
 @bot.tree.command(name="invite", description="🚀 Get the link to add BloxPulse to your server.")
 async def invite(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
     lang = get_guild_config(interaction.guild_id).get("language", "en")
     # Permissions: Send Messages, Embed Links, Attach Files, Use External Emojis, Add Reactions, Read History, View Channels (380160)
     invite_url = f"https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=380160&scope=bot%20applications.commands"
@@ -992,7 +1010,7 @@ async def invite(interaction: discord.Interaction):
         title="🚀 Take Monitoring to the Next Level!",
         description=(
             "Add **BloxPulse** to your community and enjoy the most advanced Roblox tracker on the market.\n\n"
-            "🛡️ **Guaranteed Security**\n"
+            "♖ **Guaranteed Security**\n"
             "• **No Admin Required**: We only ask for essential permissions to function.\n"
             "• **Total Privacy**: We don't read your messages; we only monitor the Roblox API.\n"
             "• **Performance**: Optimized to not cause lag in your server.\n\n"
@@ -1016,7 +1034,7 @@ async def invite(interaction: discord.Interaction):
         emoji="✨"
     ))
     
-    await interaction.response.send_message(embed=embed, view=view)
+    await interaction.followup.send(embed=embed, view=view)
 
 
 @bot.tree.command(name="setup_server", description="🏗️ Power-User: Create a professional server setup with categories and channels.")
@@ -1167,8 +1185,9 @@ async def update_member_count_channel(guild):
             except: pass
 
 
-@bot.tree.command(name="help", description="Show a guide to all available commands.")
+@bot.tree.command(name="help", description="📖 All command details & features.")
 async def help_cmd(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
     lang = get_guild_config(interaction.guild_id).get("language", "en")
     
     embed = discord.Embed(
@@ -1293,6 +1312,7 @@ async def broadcast(interaction: discord.Interaction):
 
 @bot.tree.command(name="updates", description="🕒 View the 3 most recent BloxPulse updates.")
 async def updates_history(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
     history = get_announcements()
     if not history:
         return await premium_response(interaction, "History Empty", "No announcements have been sent yet.", color=0xE74C3C)
@@ -1301,7 +1321,7 @@ async def updates_history(interaction: discord.Interaction):
     latest_embed = build_announcement_embed(history[0])
     view = UpdatesHistoryView(history)
     
-    await interaction.response.send_message(
+    await interaction.followup.send(
         content="🔍 **BloxPulse Update History**",
         embed=latest_embed,
         view=view,
@@ -1338,6 +1358,7 @@ class UpdatesHistoryView(discord.ui.View):
 @bot.tree.command(name="status", description="Advanced system diagnostics (Owner only).")
 @is_owner()
 async def status(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
     uptime  = time.time() - bot.start_time
     h, m, s = int(uptime // 3600), int((uptime % 3600) // 60), int(uptime % 60)
 
@@ -1361,6 +1382,7 @@ async def status(interaction: discord.Interaction):
 @bot.tree.command(name="config", description="⚙️ View current BloxPulse configuration for this server.")
 @has_manage_guild()
 async def config_cmd(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
     cfg       = get_guild_config(interaction.guild_id)
     ch_id     = cfg.get("channel_id")
     role_id   = cfg.get("ping_role_id")
@@ -1383,6 +1405,7 @@ async def config_cmd(interaction: discord.Interaction):
 
 @bot.tree.command(name="donate", description="💖 Support BloxPulse development and hosting.")
 async def donate(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
     embed = discord.Embed(
         title="💖 Support BloxPulse Development",
         description=(
@@ -1399,7 +1422,7 @@ async def donate(interaction: discord.Interaction):
     embed.set_footer(text="Thank you for your support ❤️", icon_url=avatar_url)
     
     view = DonationView()
-    await interaction.response.send_message(embed=embed, view=view)
+    await interaction.followup.send(embed=embed, view=view)
 
 
 @bot.tree.command(name="test", description="Send a preview of the latest update embed (Owner only).")
