@@ -27,6 +27,7 @@ class VersionInfo:
     channel:      str = "LIVE"
     source:       str = ""
     raw:          dict = field(default_factory=dict)
+    components:   List[str] = field(default_factory=list) # List of files in manifest
 
     @property
     def short_hash(self) -> str:
@@ -118,6 +119,9 @@ def _from_cdn(platform_key: str, cfg: dict, channel: str = "LIVE") -> Optional[V
     if not version:
         version = version_hash.replace("version-", "")
 
+    # NEW: Fetch components from manifest
+    components = _fetch_manifest(platform_key, version_hash)
+
     return VersionInfo(
         platform_key=platform_key,
         version=version,
@@ -125,7 +129,42 @@ def _from_cdn(platform_key: str, cfg: dict, channel: str = "LIVE") -> Optional[V
         channel=channel,
         source="Roblox CDN",
         raw={"hash": version_hash, "version": version, "channel": channel},
+        components=components
     )
+
+
+def _fetch_manifest(platform_key: str, version_hash: str) -> List[str]:
+    """
+    Downloads and parses rbxPkgManifest.txt for a given version.
+    """
+    if platform_key == "WindowsPlayer":
+        url = f"https://setup.rbxcdn.com/{version_hash}-rbxPkgManifest.txt"
+    elif platform_key == "MacPlayer":
+        url = f"https://setup.rbxcdn.com/mac/{version_hash}-rbxPkgManifest.txt"
+    else:
+        return []
+
+    text = _get_text(url)
+    if not text:
+        logger.warning("Manifest not found for %s: %s", platform_key, version_hash)
+        return []
+
+    # Parse manifest (one filename per block, usually followed by hash and size)
+    # The format is typically: 
+    # file_name
+    # hash
+    # size
+    # ...
+    lines = text.splitlines()
+    components = []
+    # Simplified parsing: every line that ends in .zip or .exe or .dll
+    for line in lines:
+        line = line.strip()
+        if line.endswith((".zip", ".exe", ".dll", ".app", ".dmg")):
+            components.append(line)
+    
+    logger.info("Parsed %d components from manifest for %s", len(components), platform_key)
+    return components
 
 
 def _from_roblox_api(platform_key: str, cfg: dict, channel: str = "LIVE") -> Optional[VersionInfo]:

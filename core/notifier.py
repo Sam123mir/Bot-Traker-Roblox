@@ -124,10 +124,31 @@ def build_update_embed(
         url=ROBLOX_URL,
         color=color,
     )
-    # Use bot avatar for thumbnail instead of placeholder icons
-    avatar_url = bot_icon or BOT_AVATAR_URL
-    embed.set_thumbnail(url=avatar_url)
     
+    # LOGOS: Use platform-specific icon for thumbnail, bot avatar for footer
+    platform_icon = cfg.get("icon_url")
+    avatar_url = bot_icon or BOT_AVATAR_URL
+    
+    if platform_icon:
+        embed.set_thumbnail(url=platform_icon)
+    else:
+        embed.set_thumbnail(url=avatar_url)
+    
+    # COMPONENTS: Show detected components from manifest
+    if vi.components:
+        # Identify "key" components (exe, dll, or first few zips)
+        key_items = [c for c in vi.components if c.endswith((".exe", ".dll"))][:5]
+        other_zips = [c for c in vi.components if c.endswith(".zip") and c not in key_items]
+        
+        comp_text = ""
+        if key_items:
+            comp_text += "**Principales:**\n" + "\n".join([f"• `{c}`" for c in key_items]) + "\n"
+        
+        if other_zips:
+            comp_text += f"\n**Otros:** `{len(other_zips)}` archivos .zip detectados."
+            
+        embed.add_field(name="📦 Componentes del Despliegue", value=comp_text or "No se detectaron archivos individuales.", inline=False)
+
     if history_data:
         history_text = ""
         for item in history_data:
