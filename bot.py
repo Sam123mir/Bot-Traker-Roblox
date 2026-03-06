@@ -114,16 +114,16 @@ class BloxPulseBot(commands.Bot):
         target = guild.system_channel or next((c for c in guild.text_channels if c.permissions_for(guild.me).send_messages), None)
         if target:
             embed = discord.Embed(
-                title="✨ Bienvenido a BloxPulse | Roblox Monitoring",
+                title="✨ Welcome to BloxPulse | Roblox Monitoring",
                 description=(
-                    "Gracias por confiar en **BloxPulse** para mantenerte al tanto de los despliegues de Roblox.\n\n"
-                    "🔒 **Seguridad y Privacidad**\n"
-                    "Somos un bot enfocado exclusivamente en datos técnicos. No requerimos permisos de Administrador ni acceso a datos personales del servidor.\n\n"
-                    "🚀 **Guía de Inicio Rápido**\n"
-                    "Para activar el monitoreo, usa los siguientes comandos:\n"
-                    "• `/setup alerts` — Configura el canal para recibir alertas de nuevas versiones.\n"
-                    "• `/setup announcements` — Recibe noticias importantes sobre la infraestructura del bot.\n\n"
-                    "Usa `/help` para explorar todas las capacidades."
+                    "Thank you for trusting **BloxPulse** to stay on top of Roblox deployments.\n\n"
+                    "🔒 **Security & Privacy**\n"
+                    "We are a bot focused exclusively on technical data. We do NOT require Administrator permissions or access to personal server data.\n\n"
+                    "🚀 **Quick Start Guide**\n"
+                    "To activate monitoring, use the following commands:\n"
+                    "• `/setup alerts` — Set the channel to receive version alerts.\n"
+                    "• `/setup announcements` — Receive important news about bot infrastructure.\n\n"
+                    "Use `/help` to explore all capabilities."
                 ),
                 color=0x00D1FF, # Professional Cyan
                 timestamp=datetime.now(timezone.utc)
@@ -132,8 +132,8 @@ class BloxPulseBot(commands.Bot):
             avatar_url = self.user.display_avatar.url if self.user else BOT_AVATAR_URL
             
             embed.set_thumbnail(url=avatar_url)
-            embed.setImage(url="https://i.imgur.com/your-professional-banner.png") # Optional placeholder for a banner if user has one
-            embed.set_footer(text="Precisión · Velocidad · Transparencia", icon_url=avatar_url)
+            embed.setImage(url=UPDATE_BANNER_URL)
+            embed.set_footer(text="Precision · Speed · Transparency", icon_url=avatar_url)
             
             try:
                 await target.send(embed=embed)
@@ -344,8 +344,8 @@ def build_announcement_embed(ann_data: dict) -> discord.Embed:
     
     from config import OFFICIAL_SERVER_URL
     embed.add_field(
-        name="🔗 Enlaces rápidos", 
-        value=f"**[Comunidad oficial]({OFFICIAL_SERVER_URL})** | **[Invitación de bot](https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=8&scope=bot%20applications.commands)**",
+        name="🔗 Quick Links", 
+        value=f"**[Official Community]({OFFICIAL_SERVER_URL})** | **[Bot Invitation](https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=380160&scope=bot%20applications.commands)**",
         inline=False
     )
     
@@ -917,17 +917,17 @@ async def ping_cmd(interaction: discord.Interaction):
         return "🟩" * filled + "⬜" * (5 - filled)
 
     embed = discord.Embed(
-        title="◈ BloxPulse · Red & Latencia",
-        description="Estado detallado de la conexión con Discord y APIs.\n\u200b",
+        title="◈ BloxPulse · Network & Latency",
+        description="Detailed status of Discord connection and APIs.\n\u200b",
         color=0x2ECC71 if (ws_latency < 200 and roblox_ok) else 0xE67E22,
         timestamp=datetime.now(timezone.utc),
     )
-    embed.add_field(name=f"{ws_indicator} Latencia Discord", value=f"`{ws_latency} ms` {get_bar(ws_latency)}", inline=True)
-    embed.add_field(name=f"{rbl_indicator} API Roblox",    value=f"`{http_ms if http_ms >= 0 else 'Timeout'} ms` {get_bar(http_ms)}", inline=True)
-    embed.add_field(name="⏱️ Tiempo Activo",               value=f"`{h}h {m}m {s}s`", inline=True)
-    embed.add_field(name="🔁 Ciclo de Monitoreo",          value=f"`{CHECK_INTERVAL}s`", inline=True)
+    embed.add_field(name=f"{ws_indicator} Discord Latency", value=f"`{ws_latency} ms` {get_bar(ws_latency)}", inline=True)
+    embed.add_field(name=f"{rbl_indicator} Roblox API",    value=f"`{http_ms if http_ms >= 0 else 'Timeout'} ms` {get_bar(http_ms)}", inline=True)
+    embed.add_field(name="⏱️ Uptime",               value=f"`{h}h {m}m {s}s`", inline=True)
+    embed.add_field(name="🔁 Monitoring Cycle",          value=f"`{CHECK_INTERVAL}s`", inline=True)
     
-    embed.set_footer(text=f"BloxPulse {BOT_VERSION} · {random.choice(['Estable', 'Operativo', 'Online'])}", icon_url=bot.user.display_avatar.url if bot.user else BOT_AVATAR_URL)
+    embed.set_footer(text=f"BloxPulse {BOT_VERSION} · {random.choice(['Stable', 'Operational', 'Online'])}", icon_url=bot.user.display_avatar.url if bot.user else BOT_AVATAR_URL)
     await interaction.followup.send(embed=embed, ephemeral=True)
 
 
@@ -936,12 +936,12 @@ async def info_cmd(interaction: discord.Interaction):
     embed = discord.Embed(
         title="◈ BloxPulse Project",
         description=(
-            "**BloxPulse** es un sistema de monitoreo global para Roblox, "
-            "diseñado para ofrecer datos precisos y rápidos sobre actualizaciones de plataformas.\n\n"
+            "**BloxPulse** is a global monitoring system for Roblox, "
+            "designed to deliver precise and fast data on platform updates.\n\n"
             "**👑 Owner/Dev:** <@1420085090570207313>\n"
             "**🛠️ Tech Stack:** Python, discord.py, Flask, Docker.\n"
-            "**🌎 Alcance:** Global (Windows, Mac, Android, iOS).\n\n"
-            "Si te gusta el proyecto, considera usar `/donate` para apoyarnos."
+            "**🌎 Scope:** Global (Windows, Mac, Android, iOS).\n\n"
+            "If you like the project, consider using `/donate` to support us."
         ),
         color=0x5865F2,
         timestamp=datetime.now(timezone.utc)
@@ -982,32 +982,31 @@ async def myid(interaction: discord.Interaction):
     )
 
 
-@bot.tree.command(name="invite", description="🚀 Obtén el enlace para añadir a BloxPulse a tu servidor.")
+@bot.tree.command(name="invite", description="🚀 Get the link to add BloxPulse to your server.")
 async def invite(interaction: discord.Interaction):
     lang = get_guild_config(interaction.guild_id).get("language", "en")
-    # Permissions: Send Messages, Embed Links, Attach Files, Use External Emojis, Add Reactions, Read History, View Channels (380032)
-    # Using a professional scope and safe permissions bitmask
+    # Permissions: Send Messages, Embed Links, Attach Files, Use External Emojis, Add Reactions, Read History, View Channels (380160)
     invite_url = f"https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=380160&scope=bot%20applications.commands"
     
     embed = discord.Embed(
-        title="🚀 ¡Lleva el Monitoreo al Siguiente Nivel!",
+        title="🚀 Take Monitoring to the Next Level!",
         description=(
-            "Añade **BloxPulse** a tu comunidad y disfruta del rastreador de Roblox más avanzado del mercado.\n\n"
-            "🛡️ **Seguridad Garantizada**\n"
-            "• **Sin Administrador**: Solo pedimos permisos esenciales para funcionar.\n"
-            "• **Privacidad Total**: No leemos tus mensajes, solo monitoreamos la API de Roblox.\n"
-            "• **Rendimiento**: Optimizado para no generar lag en tu servidor.\n\n"
-            "✅ **Funciones Premium**\n"
-            "• Alertas instantáneas de Windows, Mac, iOS y Android.\n"
-            "• Historial detallado y enlaces de descarga directa.\n"
-            "• Soporte multi-idioma automático."
+            "Add **BloxPulse** to your community and enjoy the most advanced Roblox tracker on the market.\n\n"
+            "🛡️ **Guaranteed Security**\n"
+            "• **No Admin Required**: We only ask for essential permissions to function.\n"
+            "• **Total Privacy**: We don't read your messages; we only monitor the Roblox API.\n"
+            "• **Performance**: Optimized to not cause lag in your server.\n\n"
+            "✅ **Premium Features**\n"
+            "• Instant alerts for Windows, Mac, iOS, and Android.\n"
+            "• Detailed history and direct download links.\n"
+            "• Automatic multi-language support (English by default)."
         ),
         color=0x5865F2,
         timestamp=datetime.now(timezone.utc)
     )
     avatar_url = bot.user.display_avatar.url if bot.user else BOT_AVATAR_URL
     embed.set_thumbnail(url=avatar_url)
-    embed.set_footer(text="BloxPulse · Innovación y Transparencia", icon_url=avatar_url)
+    embed.set_footer(text="BloxPulse · Innovation & Transparency", icon_url=avatar_url)
     
     view = discord.ui.View()
     view.add_item(discord.ui.Button(
@@ -1033,11 +1032,11 @@ async def setup_server(interaction: discord.Interaction):
 
     # Preview what will be created
     desc = (
-        "**ESTRUCTURA DE CANALES (Símbolos Piliapp)**\n"
+        "**CHANNEL STRUCTURE**\n"
         "┇═════ STATUS ═════┇\n"
-        "❱ Members: [Conteo Real]\n"
+        "❱ Members: [Live Count]\n"
         f"❱ Bot Version: {BOT_VERSION}\n\n"
-        "┇═════ STATUS APIs ═════┇\n"
+        "┇═════ API STATUS ═════┇\n"
         "❱ Windows: [🟢/🔴]\n"
         "❱ Mac: [🟢/🔴]\n"
         "❱ Android: [🟢/🔴]\n"
@@ -1048,15 +1047,15 @@ async def setup_server(interaction: discord.Interaction):
         "❱ Roblox-Alerts | ❱ Stats\n\n"
         "┇═════ COMMUNITY ═════┇\n"
         "❱ General | ❱ Bug-Reports | ❱ Suggestions\n\n"
-        "**ROLES PROFESIONALES**\n"
+        "**PROFESSIONAL ROLES**\n"
         "♕ 》BloxPulse Owner (Owner)\n"
         "♖ 》BloxPulse Staff (Staff)\n"
         "♙ 》Verified Member (Verified)"
     )
     
     embed = discord.Embed(
-        title="🏗️ Configuración de Plantilla Profesional",
-        description=f"¿Estás listo para aplicar esta estructura en **{interaction.guild.name}**?\n\n{desc}",
+        title="🏗️ Professional Layout Configuration",
+        description=f"Are you ready to apply this structure to **{interaction.guild.name}**?\n\n{desc}",
         color=0x00FFBB,
         timestamp=datetime.now(timezone.utc)
     )
@@ -1069,15 +1068,15 @@ class SetupConfirmView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=60)
 
-    @discord.ui.button(label="🚀 Aplicar Plantilla", style=discord.ButtonStyle.green)
+    @discord.ui.button(label="🚀 Apply Template", style=discord.ButtonStyle.green)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(content="⏳ Aplicando cambios, por favor espera...", embed=None, view=None)
+        await interaction.response.edit_message(content="⏳ Applying changes, please wait...", embed=None, view=None)
         await deploy_template(interaction.guild)
-        await interaction.followup.send("✅ **¡Servidor configurado con éxito!** La estructura profesional ha sido desplegada.", ephemeral=True)
+        await interaction.followup.send("✅ **Server configured successfully!** The professional structure has been deployed.", ephemeral=True)
 
-    @discord.ui.button(label="🗑️ Cancelar", style=discord.ButtonStyle.red)
+    @discord.ui.button(label="🗑️ Cancel", style=discord.ButtonStyle.red)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(content="❌ Configuración cancelada.", embed=None, view=None)
+        await interaction.response.edit_message(content="❌ Setup cancelled.", embed=None, view=None)
 
 async def deploy_template(guild: discord.Guild):
     # Cleanup: Delete previous BloxPulse channels and roles
@@ -1387,17 +1386,17 @@ async def donate(interaction: discord.Interaction):
     embed = discord.Embed(
         title="💖 Support BloxPulse Development",
         description=(
-            "Si te gusta **BloxPulse** y quieres apoyar su mantenimiento (servidores y café ☕), "
-            "puedes hacerlo mediante **PayPal**.\n\n"
+            "If you like **BloxPulse** and want to support its maintenance (servers and coffee ☕), "
+            "you can do so via **PayPal**.\n\n"
             "**PayPal**: `Cuentadepruebas750@gmail.com`\n\n"
-            "¡Cada donación nos ayuda a seguir trayendo mejoras constantes y mantenernos 24/7!"
+            "Every donation helps us keep bringing constant improvements and staying 24/7!"
         ),
         color=0x00FFBB,
         timestamp=datetime.now(timezone.utc)
     )
     embed.set_thumbnail(url="https://cdn-icons-png.flaticon.com/512/174/174861.png")
     avatar_url = bot.user.display_avatar.url if bot.user else None
-    embed.set_footer(text="Gracias por tu apoyo ❤️", icon_url=avatar_url)
+    embed.set_footer(text="Thank you for your support ❤️", icon_url=avatar_url)
     
     view = DonationView()
     await interaction.response.send_message(embed=embed, view=view)
