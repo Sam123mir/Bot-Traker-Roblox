@@ -78,6 +78,7 @@ def build_update_embed(
     t_dl_h = get_text(lang, "download_header")
 
     # Data block refined for "WOW" factor
+    mobile = _is_mobile(platform_key)
     if not mobile:
         data_block = (
             f"📦 **{t_ver}**\n"

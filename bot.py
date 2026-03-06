@@ -982,26 +982,39 @@ async def myid(interaction: discord.Interaction):
     )
 
 
-@bot.tree.command(name="invite", description="🚀 Get the link to add BloxPulse to your server.")
+@bot.tree.command(name="invite", description="🚀 Obtén el enlace para añadir a BloxPulse a tu servidor.")
 async def invite(interaction: discord.Interaction):
     lang = get_guild_config(interaction.guild_id).get("language", "en")
-    invite_url = f"https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=8&scope=bot%20applications.commands"
+    # Permissions: Send Messages, Embed Links, Attach Files, Use External Emojis, Add Reactions, Read History, View Channels (380032)
+    # Using a professional scope and safe permissions bitmask
+    invite_url = f"https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=380160&scope=bot%20applications.commands"
     
     embed = discord.Embed(
-        title=get_text(lang, "invite_title"),
-        description=get_text(lang, "invite_desc"),
+        title="🚀 ¡Lleva el Monitoreo al Siguiente Nivel!",
+        description=(
+            "Añade **BloxPulse** a tu comunidad y disfruta del rastreador de Roblox más avanzado del mercado.\n\n"
+            "🛡️ **Seguridad Garantizada**\n"
+            "• **Sin Administrador**: Solo pedimos permisos esenciales para funcionar.\n"
+            "• **Privacidad Total**: No leemos tus mensajes, solo monitoreamos la API de Roblox.\n"
+            "• **Rendimiento**: Optimizado para no generar lag en tu servidor.\n\n"
+            "✅ **Funciones Premium**\n"
+            "• Alertas instantáneas de Windows, Mac, iOS y Android.\n"
+            "• Historial detallado y enlaces de descarga directa.\n"
+            "• Soporte multi-idioma automático."
+        ),
         color=0x5865F2,
         timestamp=datetime.now(timezone.utc)
     )
-    embed.set_thumbnail(url=bot.user.display_avatar.url if bot.user else BOT_AVATAR_URL)
-    embed.set_footer(text="BloxPulse · Community Growth", icon_url=bot.user.display_avatar.url if bot.user else BOT_AVATAR_URL)
+    avatar_url = bot.user.display_avatar.url if bot.user else BOT_AVATAR_URL
+    embed.set_thumbnail(url=avatar_url)
+    embed.set_footer(text="BloxPulse · Innovación y Transparencia", icon_url=avatar_url)
     
     view = discord.ui.View()
     view.add_item(discord.ui.Button(
         label=get_text(lang, "invite_btn"),
         style=discord.ButtonStyle.link,
         url=invite_url,
-        emoji="🤖"
+        emoji="✨"
     ))
     
     await interaction.response.send_message(embed=embed, view=view)
