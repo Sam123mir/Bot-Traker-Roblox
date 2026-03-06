@@ -82,47 +82,59 @@ def _get_text(url: str, headers: dict = None, **kwargs) -> Optional[str]:
 
 # ── Source Functions ──────────────────────────────────────────
 
-def _from_cdn(platform_key: str, cfg: dict) -> Optional[VersionInfo]:
+def _from_cdn(platform_key: str, cfg: dict, channel: str = "LIVE") -> Optional[VersionInfo]:
     """
     Fetches Windows/Mac version hash from the Roblox CDN (setup.rbxcdn.com).
-    Windows: https://setup.rbxcdn.com/version      → plain text hash
-    Mac:     https://setup.rbxcdn.com/mac/version  → plain text hash
     """
     if platform_key == "WindowsPlayer":
-        cdn_url = "https://setup.rbxcdn.com/version"
+        cdn_url = "https://setup.rbxcdn.com/version" if channel == "LIVE" else f"https://setup.rbxcdn.com/channel/{channel}/version"
     elif platform_key == "MacPlayer":
-        cdn_url = "https://setup.rbxcdn.com/mac/version"
+        cdn_url = "https://setup.rbxcdn.com/mac/version" if channel == "LIVE" else f"https://setup.rbxcdn.com/channel/{channel}/mac/version"
     else:
         return None
 
     version_hash = _get_text(cdn_url)
     if not version_hash or not version_hash.startswith("version-"):
-        logger.warning("Unexpected CDN response for %s: %s", platform_key, version_hash)
-        return _from_roblox_api(platform_key, cfg)
+        logger.warning("Unexpected CDN response for %s on %s: %s", platform_key, channel, version_hash)
+        return _from_roblox_api(platform_key, cfg, channel)
 
     # Get pretty version number from Roblox API
     api_key = cfg.get("api_key", platform_key)
-    api_url = f"https://clientsettingscdn.roblox.com/v2/client-version/{api_key}/channel/LIVE"
+    api_url = f"https://clientsettingscdn.roblox.com/v2/client-version/{api_key}/channel/{channel}"
     data    = _get_json(api_url)
-    version = data.get("version", version_hash.replace("version-", "")) if data else version_hash.replace("version-", "")
+    
+    version = data.get("version", "") if data else ""
+    
+    # IMPROVEMENT: If API doesn't give a pretty version, or if it's just the hash, try history matching
+    if not version or version.startswith("version-") or len(version) < 5:
+        from .history import fetch_deploy_history
+        history = fetch_deploy_history(platform_key, days=7)
+        for entry in history:
+            if entry["version_hash"] == version_hash:
+                version = entry["version"]
+                logger.info("Found pretty version in history for %s: %s", platform_key, version)
+                break
+    
+    if not version:
+        version = version_hash.replace("version-", "")
 
     return VersionInfo(
         platform_key=platform_key,
         version=version,
         version_hash=version_hash,
-        channel="LIVE",
+        channel=channel,
         source="Roblox CDN",
-        raw={"hash": version_hash, "version": version},
+        raw={"hash": version_hash, "version": version, "channel": channel},
     )
 
 
-def _from_roblox_api(platform_key: str, cfg: dict) -> Optional[VersionInfo]:
+def _from_roblox_api(platform_key: str, cfg: dict, channel: str = "LIVE") -> Optional[VersionInfo]:
     """
     Fallback: Fetches version from Roblox Client Settings API.
-    https://clientsettingscdn.roblox.com/v2/client-version/{key}/channel/LIVE
+    https://clientsettingscdn.roblox.com/v2/client-version/{key}/channel/{channel}
     """
     api_key = cfg.get("api_key", platform_key)
-    url     = f"https://clientsettingscdn.roblox.com/v2/client-version/{api_key}/channel/LIVE"
+    url     = f"https://clientsettingscdn.roblox.com/v2/client-version/{api_key}/channel/{channel}"
     data    = _get_json(url)
 
     if not data or "clientVersionUpload" not in data:
@@ -132,7 +144,7 @@ def _from_roblox_api(platform_key: str, cfg: dict) -> Optional[VersionInfo]:
         platform_key=platform_key,
         version=data.get("version", ""),
         version_hash=data.get("clientVersionUpload", ""),
-        channel="LIVE",
+        channel=channel,
         source="Roblox Client Settings API",
         raw=data,
     )
@@ -233,7 +245,7 @@ _SOURCES = {
     "playstore":  _from_playstore,
 }
 
-def fetch_version(platform_key: str) -> Optional[VersionInfo]:
+def fetch_version(platform_key: str, channel: str = "LIVE") -> Optional[VersionInfo]:
     """Entry point: fetches the version for a single platform."""
     cfg = PLATFORMS.get(platform_key)
     if not cfg:
@@ -245,13 +257,17 @@ def fetch_version(platform_key: str) -> Optional[VersionInfo]:
         logger.error("Unknown source '%s' for %s", cfg["source"], platform_key)
         return None
 
+    # Only pass channel to CDN and Roblox API sources
+    if cfg["source"] in ("cdn", "roblox_api"):
+        return source_fn(platform_key, cfg, channel)
+    
     return source_fn(platform_key, cfg)
 
 
-def fetch_all() -> dict[str, Optional[VersionInfo]]:
-    """Fetches versions for all configured platforms."""
+def fetch_all(channel: str = "LIVE") -> dict[str, Optional[VersionInfo]]:
+    """Fetches versions for all configured platforms for a specific channel."""
     results = {}
     for key in PLATFORMS:
-        results[key] = fetch_version(key)
-        logger.debug("Version for %s: %s", key, results[key])
+        results[key] = fetch_version(key, channel)
+        logger.debug("Version for %s on %s: %s", key, channel, results[key])
     return results

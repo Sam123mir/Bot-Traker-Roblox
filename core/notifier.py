@@ -17,12 +17,12 @@ RDD_BASE = "https://rdd.latte.to"
 
 # ── Helpers ───────────────────────────────────────────────────
 
-def _download_link(platform_key: str, version_hash: str, lang: str) -> tuple[str, str]:
+def _download_link(platform_key: str, version_hash: str, lang: str, channel: str = "LIVE") -> tuple[str, str]:
     if platform_key == "WindowsPlayer":
-        url = f"{RDD_BASE}/?channel=LIVE&binaryType=WindowsPlayer&version={version_hash}"
+        url = f"{RDD_BASE}/?channel={channel}&binaryType=WindowsPlayer&version={version_hash}"
         return get_text(lang, "download_windows"), url
     if platform_key == "MacPlayer":
-        url = f"{RDD_BASE}/?channel=LIVE&binaryType=MacPlayer&version={version_hash}"
+        url = f"{RDD_BASE}/?channel={channel}&binaryType=MacPlayer&version={version_hash}"
         return get_text(lang, "download_macos"), url
     if platform_key == "AndroidApp":
         return get_text(lang, "view_playstore"), "https://play.google.com/store/apps/details?id=com.roblox.client"
@@ -52,6 +52,7 @@ def build_update_embed(
     # Determine what to display
     state      = get_version_data(platform_key)
     timestamps = state.get("timestamps", {})
+    channel    = vi.channel # Get channel from VersionInfo
 
     if selected_hash and selected_hash != state.get("current", ""):
         # Viewing a historical version
@@ -59,7 +60,7 @@ def build_update_embed(
         d_short   = d_hash.replace("version-", "")
         d_version = d_short
         dt_str    = timestamps.get(d_hash, "Unknown date")
-        dl_label, dl_url = _download_link(platform_key, d_hash, lang)
+        dl_label, dl_url = _download_link(platform_key, d_hash, lang, channel=channel)
         is_historical = True
     else:
         # Current version
@@ -67,7 +68,7 @@ def build_update_embed(
         d_short   = vi.short_hash
         d_version = vi.version
         dt_str    = timestamps.get(d_hash, "Just detected")
-        dl_label, dl_url = _download_link(platform_key, d_hash, lang)
+        dl_label, dl_url = _download_link(platform_key, d_hash, lang, channel=channel)
         is_historical = False
 
     # Translated field labels
@@ -84,7 +85,10 @@ def build_update_embed(
             f"> ┃ `{d_version}`{gap}┃ **{label}**\n"
             f"> \n"
             f"> 🔑 **{t_hash}**{gap}{gap}📅 **Detected**\n"
-            f"> ┃ `{d_short}`{gap}┃ `{dt_str}`"
+            f"> ┃ `{d_short}`{gap}┃ `{dt_str}`\n"
+            f"> \n"
+            f"> 🌐 **Channel**\n"
+            f"> ┃ `{channel}`"
         )
     else:
         data_block = (

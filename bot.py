@@ -1,9 +1,4 @@
-# ============================================================
-#   BloxPulse | Roblox Version Monitor — bot.py
-#   Full Discord Bot — architected for stability and premium UX.
-# ============================================================
-
-import os
+import os as _os
 import asyncio
 import re
 import time
@@ -41,15 +36,15 @@ from discord.ext import tasks
 API_STATUS = {"WindowsPlayer": True, "MacPlayer": True, "AndroidApp": True, "iOS": True}
 
 # ── Logging ──────────────────────────────────────────────────
-_LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
-os.makedirs(_LOG_DIR, exist_ok=True)
+_LOG_DIR = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "logs")
+_os.makedirs(_LOG_DIR, exist_ok=True)
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler(os.path.join(_LOG_DIR, "bot.log"), encoding="utf-8")
+        logging.FileHandler(_os.path.join(_LOG_DIR, "bot.log"), encoding="utf-8")
     ]
 )
 logger = logging.getLogger("BloxPulse")
@@ -80,7 +75,7 @@ class BloxPulseBot(commands.Bot):
     async def setup_hook(self):
         logger.info("BloxPulse: Bot configured and slash commands synchronized.")
         # Ensure data dir exists
-        os.makedirs("data", exist_ok=True)
+        _os.makedirs("data", exist_ok=True)
         self.monitor_task.start()
         # Background sync to avoid blocking the first few interactions
         asyncio.create_task(self.tree.sync())
@@ -111,11 +106,6 @@ class BloxPulseBot(commands.Bot):
         """Update member count channel."""
         await update_dynamic_status(member.guild)
 
-
-    @monitor_task.before_loop
-    async def before_monitor(self):
-        await self.wait_until_ready()
-
     async def on_guild_join(self, guild: discord.Guild):
         """Welcome message and setup prompt."""
         logger.info(f"BloxPulse: Joined new guild: {guild.name} ({guild.id})")
@@ -139,6 +129,7 @@ class BloxPulseBot(commands.Bot):
             embed.set_footer(text="BloxPulse · Monitoring System", icon_url=avatar_url)
             try: await target.send(embed=embed)
             except: pass
+
 
     @tasks.loop(seconds=CHECK_INTERVAL)
     async def monitor_task(self):
@@ -193,6 +184,10 @@ class BloxPulseBot(commands.Bot):
 
         except Exception as e:
             logger.error(f"Error in monitor_task: {e}", exc_info=True)
+
+    @monitor_task.before_loop
+    async def before_monitor(self):
+        await self.wait_until_ready()
 
     async def broadcast_update(self, platform_key: str, vi: VersionInfo, prev_hash: str, is_build: bool = False):
         """Sends update/build alert to all configured guild channels."""
