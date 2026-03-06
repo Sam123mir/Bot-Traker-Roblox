@@ -77,30 +77,29 @@ def build_update_embed(
     t_hash = get_text(lang, "build_hash")
     t_dl_h = get_text(lang, "download_header")
 
-    gap   = "\u2800" * 4 # Invisible separator
+    gap = "\u2800" * 6  # Spacing for dual column
 
-    # Data block restored to Side-by-Side style
-    if not mobile:
+    # Final "Side-by-Side" with '|' character style
+    if not _is_mobile(platform_key): # Assuming 'mobile' was meant to be _is_mobile(platform_key)
         data_block = (
-            f"> � **{t_ver}**{gap}{gap}📡 **{t_plat}**\n"
-            f"> ┃ `{d_version}`{gap}┃ **{label}**\n"
-            f"> \n"
-            f"> 🔑 **{t_hash}**{gap}{gap}📅 **Detected**\n"
-            f"> ┃ `{d_short}`{gap}┃ `{dt_str}`\n"
-            f"> \n"
-            f"> 🌐 **Channel**\n"
-            f"> ┃ `{channel}`"
+            f"🔖 **{t_ver}**{gap}{gap}📡 **{t_plat}**\n"
+            f"| `{d_version}`{gap}| **{label}**\n"
+            f"\n"
+            f"🔑 **{t_hash}**{gap}{gap}📅 **Detected**\n"
+            f"| `{d_short}`{gap}| `{dt_str}`\n"
+            f"\n"
+            f"🌐 **Channel**\n"
+            f"| `{channel}`"
         )
     else:
-        # Mobile layout
+        # Mobile layout - compact with '|'
         data_block = (
-            f"> 🔖 **{t_ver}**: `{d_version}`\n"
-            f"> 📡 **{t_plat}**: {label}\n"
-            f"> 🔑 **{t_hash}**: `{d_short}`\n"
-            f"> 🌐 **Channel**: `{channel}`\n"
-            f"> 📅 **Detected**: {dt_str}"
+            f"🔖 **{t_ver}**: | `{d_version}`\n"
+            f"📡 **{t_plat}**: | **{label}**\n"
+            f"🔑 **{t_hash}**: | `{d_short}`\n"
+            f"🌐 **Channel**: | `{channel}`\n"
+            f"📅 **Detected**: | `{dt_str}`"
         )
-
     intro_tag = " — *Historical Build*" if is_historical else ""
     intro     = (
         f"{get_text(lang, 'intro_1', platform=label)}\n"
