@@ -41,11 +41,11 @@ class VersionInfo:
 # ── Network Utilities ─────────────────────────────────────────
 
 _HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/122.0.0.0 Safari/537.36"
-    )
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
 }
 
 def _get_json(url: str, headers: dict = None, **kwargs) -> Optional[dict]:
@@ -58,6 +58,8 @@ def _get_json(url: str, headers: dict = None, **kwargs) -> Optional[dict]:
             return r.json()
         except requests.HTTPError as e:
             logger.warning("HTTP %s on %s (attempt %d/%d)", e.response.status_code, url, attempt, RETRY_ATTEMPTS)
+            if e.response.status_code == 403:
+                time.sleep(RETRY_DELAY * 2) # Extra cool-off for 403s
         except Exception as e:
             logger.warning("Error on %s (attempt %d/%d): %s", url, attempt, RETRY_ATTEMPTS, e)
         if attempt < RETRY_ATTEMPTS:
@@ -74,6 +76,8 @@ def _get_text(url: str, headers: dict = None, **kwargs) -> Optional[str]:
             return r.text.strip()
         except requests.HTTPError as e:
             logger.warning("HTTP %s on %s (attempt %d/%d)", e.response.status_code, url, attempt, RETRY_ATTEMPTS)
+            if e.response.status_code == 403:
+                time.sleep(RETRY_DELAY * 2) # Extra cool-off for 403s
         except Exception as e:
             logger.warning("Error on %s (attempt %d/%d): %s", url, attempt, RETRY_ATTEMPTS, e)
         if attempt < RETRY_ATTEMPTS:
@@ -137,14 +141,17 @@ def _fetch_manifest(platform_key: str, version_hash: str) -> List[str]:
     """
     Downloads and parses rbxPkgManifest.txt for a given version.
     """
+    headers = _HEADERS.copy()
     if platform_key == "WindowsPlayer":
         url = f"https://setup.rbxcdn.com/{version_hash}-rbxPkgManifest.txt"
+        headers["Referer"] = "https://www.roblox.com/"
     elif platform_key == "MacPlayer":
         url = f"https://setup.rbxcdn.com/mac/{version_hash}-rbxPkgManifest.txt"
+        headers["Referer"] = "https://www.roblox.com/download/client?os=mac"
     else:
         return []
 
-    text = _get_text(url)
+    text = _get_text(url, headers=headers)
     if not text:
         logger.warning("Manifest not found for %s: %s", platform_key, version_hash)
         return []

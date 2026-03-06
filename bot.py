@@ -67,6 +67,8 @@ class BloxPulseBot(commands.Bot):
         intents.members = True
         # Prevent duplicate welcomes in same session
         self.welcomed_guilds = set()
+        self.welcome_lock    = asyncio.Lock()
+        self.startup_check_done = False
         
         super().__init__(
             command_prefix="!",
@@ -99,13 +101,21 @@ class BloxPulseBot(commands.Bot):
             backfill_history(plat, entries)
 
         # 2. Update dynamic status for all guilds and check for new ones
+        if self.startup_check_done:
+            return
+        
         configured_guilds = get_all_guilds()
+        logger.info(f"BloxPulse: Startup check — Scanning {len(self.guilds)} guilds...")
+        
         for guild in self.guilds:
             await update_dynamic_status(guild)
             # If guild is not in our database and not welcomed this session
             if guild.id not in configured_guilds and guild.id not in self.welcomed_guilds:
                 logger.info(f"BloxPulse: Startup check — New guild detected: {guild.name}")
                 await self.on_guild_join(guild)
+        
+        self.startup_check_done = True
+        logger.info("BloxPulse: Startup check complete.")
 
     async def on_member_join(self, member: discord.Member):
         """Update member count channel."""
@@ -117,9 +127,10 @@ class BloxPulseBot(commands.Bot):
 
     async def on_guild_join(self, guild: discord.Guild):
         """Welcome message and setup prompt with inviter detection."""
-        if guild.id in self.welcomed_guilds:
-            return
-        self.welcomed_guilds.add(guild.id)
+        async with self.welcome_lock:
+            if guild.id in self.welcomed_guilds:
+                return
+            self.welcomed_guilds.add(guild.id)
         
         logger.info(f"BloxPulse: Processing welcome for guild: {guild.name} ({guild.id})")
         
@@ -127,8 +138,9 @@ class BloxPulseBot(commands.Bot):
         inviter = None
         if guild.me.guild_permissions.view_audit_log:
             try:
-                async for entry in guild.audit_logs(limit=5, action=discord.AuditLogAction.bot_add):
-                    if entry.target.id == self.user.id:
+                # Increased limit and timeout for better reliability
+                async for entry in guild.audit_logs(limit=10, action=discord.AuditLogAction.bot_add, oldest_first=False):
+                    if entry.target and entry.target.id == self.user.id:
                         inviter = entry.user
                         break
             except Exception as e:
