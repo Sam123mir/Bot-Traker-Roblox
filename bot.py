@@ -1,17 +1,28 @@
+# bot.py
+"""
+Main entry point for the BloxPulse Bot.
+Initializes the Discord client and dynamically loads all extensions (Cogs)
+from the `commands/` and `systems/` directories. Also launches the REST API.
+"""
+from __future__ import annotations
+
 import os
 import asyncio
 import logging
+from datetime import datetime, timezone
+
 import discord
 from discord import app_commands
 from discord.ext import commands
-from datetime import datetime, timezone
 
 from config import DISCORD_BOT_TOKEN, BOT_VERSION, BOT_AVATAR_URL
 from core.storage import get_guild_config
 from core.notifier import premium_response
 from api import start_api
 
-# ── Logging ──────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
+#  Logging configuration
+# ──────────────────────────────────────────────────────────────────────────────
 _LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
 os.makedirs(_LOG_DIR, exist_ok=True)
 
@@ -23,9 +34,11 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
-logger = logging.getLogger("BloxPulse.Main")
+logger = logging.getLogger("BloxPulse.Core")
 
-# ── Bot Instance ─────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
+#  Bot Instance
+# ──────────────────────────────────────────────────────────────────────────────
 class BloxPulseBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
@@ -81,7 +94,10 @@ class BloxPulseBot(commands.Bot):
     async def on_error(self, event, *args, **kwargs):
         logger.error(f"Unexpected event error in {event}:", exc_info=True)
 
-# ── Initialize ───────────────────────────────────────────────
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Initialize
+# ──────────────────────────────────────────────────────────────────────────────
 bot = BloxPulseBot()
 
 @bot.tree.error

@@ -13,6 +13,7 @@ admin_bp    – GET /api/v1/admin/*   (protected)
 from __future__ import annotations
 
 import logging
+import discord
 from datetime import datetime, timezone
 from typing import Any
 

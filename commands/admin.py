@@ -1,16 +1,28 @@
-import discord
-from discord.ext import commands
-from discord import app_commands
+# commands/admin.py
+"""
+Server management commands.
+Allows administrators to configure alerts, announcements, and language.
+"""
+from __future__ import annotations
+
 from typing import Optional
-from datetime import datetime, timezone
 
-from core.storage import get_guild_config, set_guild_config
-from core.notifier import premium_response
+import discord
+from discord import app_commands
+from discord.ext import commands
+
 from core.i18n import get_text
+from core.notifier import premium_response
 from core.perms import has_manage_guild
+from core.storage import get_guild_config, set_guild_config
 
+# ──────────────────────────────────────────────────────────────────────────────
+#  Admin Commands Cog
+# ──────────────────────────────────────────────────────────────────────────────
 class AdminCommands(commands.Cog):
-    def __init__(self, bot):
+    """Cog for server administrator configurations."""
+    
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
 
     setup_group = app_commands.Group(name="setup", description="🔧 Configure BloxPulse settings for your server.")

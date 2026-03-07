@@ -1,13 +1,13 @@
-# ============================================================
-#   BloxPulse | Roblox Version Monitor — core/checker.py
-#   Fetches versions from all supported platforms.
-# ============================================================
-
+# core/checker.py
+"""
+Version fetching and parsing logic.
+Retrieves and compares versions from all supported Roblox platforms.
+"""
 from __future__ import annotations
 
+import logging
 import re
 import time
-import logging
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -15,10 +15,11 @@ import requests
 
 from config import PLATFORMS, REQUEST_TIMEOUT, RETRY_ATTEMPTS, RETRY_DELAY
 
-logger = logging.getLogger("monitor.checker")
+logger = logging.getLogger("BloxPulse.Checker")
 
-# ── Data Model ────────────────────────────────────────────────
-
+# ──────────────────────────────────────────────────────────────────────────────
+#  Data Model
+# ──────────────────────────────────────────────────────────────────────────────
 @dataclass
 class VersionInfo:
     platform_key: str
@@ -38,7 +39,9 @@ class VersionInfo:
         return f"{self.version} ({self.version_hash})"
 
 
-# ── Network Utilities ─────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
+#  Network Utilities
+# ──────────────────────────────────────────────────────────────────────────────
 
 _HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -85,7 +88,9 @@ def _get_text(url: str, headers: dict = None, **kwargs) -> Optional[str]:
     return None
 
 
-# ── Source Functions ──────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
+#  Source Functions
+# ──────────────────────────────────────────────────────────────────────────────
 
 def _from_cdn(platform_key: str, cfg: dict, channel: str = "LIVE") -> Optional[VersionInfo]:
     """
@@ -282,7 +287,9 @@ def _from_playstore(platform_key: str, cfg: dict) -> Optional[VersionInfo]:
     )
 
 
-# ── Dispatcher ────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
+#  Dispatcher
+# ──────────────────────────────────────────────────────────────────────────────
 
 _SOURCES = {
     "cdn":        _from_cdn,

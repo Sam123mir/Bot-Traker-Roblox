@@ -1,23 +1,36 @@
+# systems/monitoring.py
+"""
+Background monitoring system.
+Polls APIs for new versions and dispatches alerts to configured guilds.
+"""
+from __future__ import annotations
+
 import asyncio
 import logging
 import time
-import discord
-from discord.ext import commands, tasks
 from datetime import datetime, timezone
 
-from config import CHECK_INTERVAL, BOT_AVATAR_URL, BOT_VERSION
-from core.checker import fetch_all, VersionInfo
-from core.storage import get_version_data, update_version, get_all_guilds
-from core.notifier import build_update_embed, create_language_view
+import discord
+from discord.ext import commands, tasks
+
+from config import BOT_AVATAR_URL, BOT_VERSION, CHECK_INTERVAL
+from core.checker import VersionInfo, fetch_all
 from core.history import fetch_deploy_history
+from core.notifier import build_update_embed, create_language_view
+from core.storage import get_all_guilds, get_version_data, update_version
 
 logger = logging.getLogger("BloxPulse.Monitoring")
 
 # Global status tracking for the API service to consume
 API_STATUS = {"WindowsPlayer": True, "MacPlayer": True, "AndroidApp": True, "iOS": True}
 
+# ──────────────────────────────────────────────────────────────────────────────
+#  Monitoring Cog
+# ──────────────────────────────────────────────────────────────────────────────
 class MonitoringSystem(commands.Cog):
-    def __init__(self, bot):
+    """Cog running the background version checking loops."""
+    
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.monitor_task.start()
 

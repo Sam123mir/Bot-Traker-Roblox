@@ -1,21 +1,24 @@
-# ============================================================
-#   BloxPulse | Roblox Version Monitor — storage.py
-#   Version persistence and server configuration.
-# ============================================================
-
+# core/storage.py
+"""
+Version persistence and server configuration management.
+Handles reading and writing to local JSON databases.
+"""
 from __future__ import annotations
+
 import json
 import logging
 import os
 import shutil
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
-from config import VERSIONS_FILE, GUILDS_FILE, ANNOUNCEMENTS_FILE
+from config import ANNOUNCEMENTS_FILE, GUILDS_FILE, VERSIONS_FILE
 
-logger = logging.getLogger("monitor.storage")
+logger = logging.getLogger("BloxPulse.Storage")
 
-# ── File Helpers ──────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
+#  File Helpers
+# ──────────────────────────────────────────────────────────────────────────────
 
 def _load_json(path: str) -> dict:
     if not os.path.exists(path):
@@ -43,7 +46,9 @@ def _save_json(path: str, data: dict) -> bool:
             os.remove(tmp)
         return False
 
-# ── Version Persistence ───────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
+#  Version Persistence
+# ──────────────────────────────────────────────────────────────────────────────
 
 def _now_str() -> str:
     """Returns current UTC time as a readable string."""
@@ -138,13 +143,16 @@ def backfill_history(platform_key: str, entries: list[dict]):
         _save_json(VERSIONS_FILE, full_data)
         logger.info("Backfilled %d versions for %s", len(entries), platform_key)
 
-def get_all_guilds() -> List[int]:
-    """Returns a list of all guild IDs that have a stored configuration."""
-    data = _load_json(GUILDS_FILE)
-    return [int(gid) for gid in data.keys()]
+# ──────────────────────────────────────────────────────────────────────────────
+#  Server Configuration & Guilds
+# ──────────────────────────────────────────────────────────────────────────────
+
+def get_all_guilds() -> dict:
+    """Returns a dictionary of all guild IDs mapped to their configuration."""
+    return _load_json(GUILDS_FILE)
 
 def get_guild_config(guild_id: int) -> dict:
-    data = _load_json(GUILDS_FILE)
+    data = get_all_guilds()
     return data.get(str(guild_id), {
         "channel_id":   None,
         "ping_role_id": None,
@@ -167,9 +175,6 @@ def set_guild_config(guild_id: int, key: str, value) -> bool:
     data[gid][key] = value
     return _save_json(GUILDS_FILE, data)
 
-def get_all_guilds() -> dict:
-    return _load_json(GUILDS_FILE)
-
 def get_all_announcement_channels() -> list[int]:
     """Returns a list of all configured announcement channel IDs."""
     data = get_all_guilds()
@@ -180,7 +185,9 @@ def get_all_announcement_channels() -> list[int]:
             channels.append(int(chan_id))
     return channels
 
-# ── Announcement History ──────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
+#  Announcement History
+# ──────────────────────────────────────────────────────────────────────────────
 
 def get_announcements() -> list[dict]:
     """Returns the list of the last 3 announcements."""

@@ -1,12 +1,20 @@
-import discord
-from discord.ext import commands
-from discord import app_commands
+# systems/welcome.py
+"""
+Server welcome and onboarding system.
+Handles new members, auto-roles, and bot join events.
+"""
+from __future__ import annotations
+
 import logging
 from datetime import datetime, timezone
 
-from core.storage import get_guild_config, set_guild_config
-from core.notifier import build_member_welcome_embed
+import discord
+from discord import app_commands
+from discord.ext import commands
+
 from core.i18n import get_text
+from core.notifier import build_member_welcome_embed
+from core.storage import get_guild_config, set_guild_config
 
 logger = logging.getLogger("BloxPulse.Welcome")
 

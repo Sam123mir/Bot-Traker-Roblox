@@ -1,19 +1,31 @@
-import discord
-from discord.ext import commands
-from discord import app_commands
+# commands/developer.py
+"""
+Developer and owner-exclusive commands.
+Provides system diagnostics, broadcast utilities, and debugging tools.
+"""
+from __future__ import annotations
+
 import asyncio
-import time
 import logging
+import time
 from datetime import datetime, timezone
 
-from config import BOT_VERSION, API_PLATFORM_MAPPING, PLATFORMS, BOT_AVATAR_URL, CHECK_INTERVAL, DEVELOPERS
-from core.storage import get_version_data, get_guild_config, get_all_guilds, save_announcement
-from core.notifier import build_update_embed, create_language_view, premium_response, build_announcement_embed
-from core.checker import fetch_all, VersionInfo
-from core.perms import is_owner
+import discord
+from discord import app_commands
+from discord.ext import commands
+
+from config import API_PLATFORM_MAPPING, BOT_AVATAR_URL, BOT_VERSION, CHECK_INTERVAL, DEVELOPERS, PLATFORMS
+from core.checker import VersionInfo, fetch_all
 from core.i18n import get_text
+from core.notifier import build_announcement_embed, build_update_embed, create_language_view, premium_response
+from core.perms import is_owner
+from core.storage import get_all_guilds, get_guild_config, get_version_data, save_announcement
 
 logger = logging.getLogger("BloxPulse.Developer")
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  UI Components (Views & Modals)
+# ──────────────────────────────────────────────────────────────────────────────
 
 class AnnouncementModal(discord.ui.Modal, title='📣 Create Global Broadcast'):
     ann_title = discord.ui.TextInput(
@@ -98,8 +110,13 @@ class AnnouncementReviewView(discord.ui.View):
         await interaction.response.send_message("Broadcast cancelled.", ephemeral=True)
         self.stop()
 
+# ──────────────────────────────────────────────────────────────────────────────
+#  Developer Commands Cog
+# ──────────────────────────────────────────────────────────────────────────────
 class DeveloperCommands(commands.Cog):
-    def __init__(self, bot):
+    """Cog grouping all owner-exclusive tools."""
+    
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
 
     @app_commands.command(name="help_dev", description="🛠️ Exclusive Developer command — Full command list.")

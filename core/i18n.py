@@ -1,9 +1,14 @@
-# ============================================================
-#   BloxPulse | Roblox Version Monitor — i18n.py
-#   Sistema de internacionalización (Traducciones).
-# ============================================================
+# core/i18n.py
+"""
+Internationalization (i18n) module.
+Provides centralized translation strings for the bot.
+"""
+from __future__ import annotations
 
-TRANSLATIONS = {
+# ──────────────────────────────────────────────────────────────────────────────
+#  Translations Dictionary
+# ──────────────────────────────────────────────────────────────────────────────
+TRANSLATIONS: dict[str, dict[str, str]] = {
     "es": {
         "update_title": "✨ Roblox {platform} actualizado!",
         "intro_1": "*Roblox ha desplegado una nueva compilación para **{platform}**.*",

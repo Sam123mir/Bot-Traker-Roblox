@@ -1,6 +1,18 @@
+# core/perms.py
+"""
+Discord permission checking decorators.
+Ensures commands are restricted to authorized users only.
+"""
+from __future__ import annotations
+
 import discord
 from discord import app_commands
+
 from config import DEVELOPERS
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Permission Decorators
+# ──────────────────────────────────────────────────────────────────────────────
 
 def is_owner():
     """Check if the user is in the DEVELOPERS list."""

@@ -1,18 +1,31 @@
-import discord
-from discord.ext import commands
-from discord import app_commands
+# commands/member.py
+"""
+Public member commands.
+Provides version lookups, downloads, and general bot information.
+"""
+from __future__ import annotations
+
 import asyncio
-import time
 import random
-import aiohttp
+import time
 from datetime import datetime, timezone
 
-from config import PLATFORMS, BOT_VERSION, BOT_AVATAR_URL, API_PLATFORM_MAPPING, CHECK_INTERVAL
-from core.checker import fetch_all, VersionInfo
-from core.storage import get_version_data, get_guild_config, get_announcements
-from core.notifier import build_update_embed, create_language_view, premium_response, build_announcement_embed
+import aiohttp
+import discord
+from discord import app_commands
+from discord.ext import commands
+
+from config import API_PLATFORM_MAPPING, BOT_AVATAR_URL, BOT_VERSION, CHECK_INTERVAL, PLATFORMS
+from core.checker import VersionInfo, fetch_all
 from core.history import fetch_deploy_history, make_rdd_url
 from core.i18n import get_text
+from core.notifier import build_announcement_embed, build_update_embed, create_language_view, premium_response
+from core.storage import get_announcements, get_guild_config, get_version_data
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  UI Components (Views & Modals)
+# ──────────────────────────────────────────────────────────────────────────────
 
 class VersionHistorySelect(discord.ui.Select):
     def __init__(self, platform_key: str, entries: list[dict]):
@@ -129,8 +142,14 @@ class UpdatesHistoryView(discord.ui.View):
         super().__init__(timeout=None)
         self.add_item(UpdatesHistorySelect(history))
 
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Member Commands Cog
+# ──────────────────────────────────────────────────────────────────────────────
 class MemberCommands(commands.Cog):
-    def __init__(self, bot):
+    """Cog grouping all public-facing member commands."""
+    
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
 
     @app_commands.command(name="help", description="📖 All command details & features for members and owners.")

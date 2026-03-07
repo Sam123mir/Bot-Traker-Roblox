@@ -1,24 +1,25 @@
-# ============================================================
-#   BloxPulse | Roblox Version Monitor — core/history.py
-#   Fetches version history from Roblox's public DeployHistory.txt
-# ============================================================
-
+# core/history.py
+"""
+Version history fetching logic.
+Parses the public DeployHistory.txt from Roblox CDN.
+"""
 from __future__ import annotations
 
 import logging
 import re
 import time
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import requests
 
-from config import REQUEST_TIMEOUT, RETRY_ATTEMPTS, RETRY_DELAY, HISTORY_DAYS, HISTORY_MAX
+from config import HISTORY_DAYS, HISTORY_MAX, REQUEST_TIMEOUT, RETRY_ATTEMPTS, RETRY_DELAY
 
-logger = logging.getLogger("monitor.history")
+logger = logging.getLogger("BloxPulse.History")
 
-# ── CDN URLs ─────────────────────────────────────────────────
-
+# ──────────────────────────────────────────────────────────────────────────────
+#  CDN URLs
+# ──────────────────────────────────────────────────────────────────────────────
 _DEPLOY_HISTORY_URLS = {
     "WindowsPlayer":   "https://setup.rbxcdn.com/DeployHistory.txt",
     "WindowsStudio64": "https://setup.rbxcdn.com/DeployHistory.txt",

@@ -1,15 +1,27 @@
-import discord
-from discord.ui import View, Select
+# core/notifier.py
+"""
+Embed builders and messaging utilities.
+Handles the creation of professional Discord embeds for notifications.
+"""
+from __future__ import annotations
+
 import random
 from datetime import datetime, timezone
-from typing import Optional, List
+from typing import Optional
 
-from config import PLATFORMS, BOT_AVATAR_URL, ROBLOX_URL, BOT_VERSION
+import discord
+from discord.ui import Select, View
+
+from config import BOT_AVATAR_URL, BOT_VERSION, PLATFORMS, ROBLOX_URL
 from .checker import VersionInfo
 from .i18n import get_text
 from .storage import get_version_data
 
 RDD_BASE = "https://rdd.latte.to"
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Premium Responses
+# ──────────────────────────────────────────────────────────────────────────────
 
 async def premium_response(
     interaction: discord.Interaction,
@@ -56,8 +68,9 @@ async def premium_response(
     except Exception:
         pass
 
-# ── Helpers ───────────────────────────────────────────────────
-
+# ──────────────────────────────────────────────────────────────────────────────
+#  Helpers
+# ──────────────────────────────────────────────────────────────────────────────
 def _download_link(platform_key: str, version_hash: str, lang: str, channel: str = "LIVE") -> tuple[str, str]:
     if platform_key == "WindowsPlayer":
         url = f"{RDD_BASE}/?channel={channel}&binaryType=WindowsPlayer&version={version_hash}"
@@ -74,8 +87,9 @@ def _download_link(platform_key: str, version_hash: str, lang: str, channel: str
 def _is_mobile(platform_key: str) -> bool:
     return platform_key in ("AndroidApp", "iOS")
 
-# ── Embed Builder ─────────────────────────────────────────────
-
+# ──────────────────────────────────────────────────────────────────────────────
+#  Embed Builder
+# ──────────────────────────────────────────────────────────────────────────────
 def build_update_embed(
     platform_key: str,
     vi: VersionInfo,
@@ -203,8 +217,9 @@ def build_announcement_embed(ann_data: dict) -> discord.Embed:
         
     return embed
 
-# ── Views ──────────────────────────────────────────────────────
-
+# ──────────────────────────────────────────────────────────────────────────────
+#  Views
+# ──────────────────────────────────────────────────────────────────────────────
 class LanguageSelect(Select):
     def __init__(self, platform_key, vi, prev_hash, current_lang):
         options = [
