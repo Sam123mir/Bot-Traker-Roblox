@@ -25,7 +25,7 @@ from core.storage import (
     get_all_guilds, get_guild_config, set_guild_config,
     get_all_announcement_channels, save_announcement, get_announcements
 )
-from core.notifier import build_update_embed, create_language_view
+from core.notifier import build_update_embed, create_language_view, build_member_welcome_embed
 from core.history import fetch_deploy_history, make_rdd_url
 from core.i18n import get_text
 
@@ -118,8 +118,43 @@ class BloxPulseBot(commands.Bot):
         logger.info("BloxPulse: Startup check complete.")
 
     async def on_member_join(self, member: discord.Member):
-        """Update member count channel."""
+        """Welcome new member with a professional embed."""
+        # 1. Update member count channel if configured
         await update_dynamic_status(member.guild)
+        
+        # 2. Fetch guild configuration for welcome channel and language
+        cfg = get_guild_config(member.guild.id)
+        lang = cfg.get("language", "en")
+        welcome_chid = cfg.get("welcome_channel_id")
+        
+        # 3. Resolve target channel
+        # Priority: Specific Welcome Channel -> Main Notification Channel -> System Channel -> First available
+        target_channel = member.guild.get_channel(welcome_chid) if welcome_chid else None
+        
+        if not target_channel:
+            # Fallback to general notification channel
+            target_channel = member.guild.get_channel(cfg.get("channel_id"))
+            
+        if not target_channel:
+            # Fallback to Discord's system channel
+            target_channel = member.guild.system_channel
+            
+        if not target_channel:
+            # Last resort: find first readable/writable channel
+            for channel in member.guild.text_channels:
+                if channel.permissions_for(member.guild.me).send_messages:
+                    target_channel = channel
+                    break
+        
+        # 4. Construct and send the professional embed
+        if target_channel:
+            try:
+                # Use a small non-blocking delay to ensure avatar URL is settled
+                embed = build_member_welcome_embed(member, lang)
+                await target_channel.send(content=member.mention, embed=embed)
+                logger.info(f"BloxPulse: Welcomed {member.name} in {member.guild.name} ({target_channel.name})")
+            except Exception as e:
+                logger.error(f"BloxPulse: Failed to send member welcome in {member.guild.name}: {e}")
 
     async def on_member_remove(self, member: discord.Member):
         """Update member count channel."""
@@ -1229,30 +1264,92 @@ async def update_member_count_channel(guild):
             except: pass
 
 
-@bot.tree.command(name="help", description="📖 All command details & features.")
+@bot.tree.command(name="help", description="📖 All command details & features for members and owners.")
 async def help_cmd(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
     lang = get_guild_config(interaction.guild_id).get("language", "en")
     
     embed = discord.Embed(
-        title="✨ BloxPulse | Command Guide",
-        description=(
-            "Welcome to **BloxPulse**. Use these commands to monitor Roblox deployments in real-time.\n\u200b"
-        ),
-        color=0x5865F2,
+        title=get_text(lang, "help_title"),
+        description=get_text(lang, "help_desc"),
+        color=0x00e5ff,
         timestamp=datetime.now(timezone.utc),
     )
+    
+    # Member Commands
     embed.add_field(
-        name=get_text(lang, "owner_cmds"),
+        name=get_text(lang, "user_cmds"),
         value=(
-            "`/broadcast` — Send an update via Form (Modal)\n"
-            "`/status` — System diagnostics\n"
-            "`/test` — Simulate a version update"
+            "`/updates` — View recent bot news\n"
+            "`/version` — In-depth version checker\n"
+            "`/download` — Get direct install links\n"
+            "`/compare` — Diff two versions\n"
+            "`/ping` — Check bot latency\n"
+            "`/info` — Bot & System details\n"
+            "`/invite` — Bring BloxPulse to your server\n"
+            "`/donate` — Support development"
         ),
         inline=False,
     )
-    embed.set_footer(text="BloxPulse Global Monitor", icon_url=bot.user.display_avatar.url)
-    await interaction.response.send_message(embed=embed, ephemeral=True)
+    
+    # Server Owner Commands
+    embed.add_field(
+        name=get_text(lang, "admin_cmds"),
+        value=(
+            "`/setup alerts` — Configure update channel\n"
+            "`/setup announcements` — Set news channel\n"
+            "`/setup welcome` — Configure welcome messages\n"
+            "`/language` — Change server language\n"
+            "`/config` — View current server settings"
+        ),
+        inline=False,
+    )
+    
+    embed.set_footer(text="BloxPulse | Professional Monitoring", icon_url=bot.user.display_avatar.url)
+    await interaction.followup.send(embed=embed, ephemeral=True)
+
+@bot.tree.command(name="help_dev", description="🛠️ Exclusive Developer command — Full command list.")
+@is_owner()
+async def help_dev(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+    lang = get_guild_config(interaction.guild_id).get("language", "en")
+    
+    embed = discord.Embed(
+        title="🛠️ BloxPulse | Developer Console Help",
+        description="Comprehensive guide to all system commands (Member, Admin, and Developer).\n\u200b",
+        color=0xa855f7, # Purple for dev
+        timestamp=datetime.now(timezone.utc),
+    )
+    
+    # Member Section
+    embed.add_field(
+        name=get_text(lang, "user_cmds"),
+        value="`/updates`, `/version`, `/download`, `/compare`, `/ping`, `/info`, `/platforms`, `/myid`, `/invite`, `/donate`.",
+        inline=False
+    )
+    
+    # Admin Section
+    embed.add_field(
+        name=get_text(lang, "admin_cmds"),
+        value="`/setup alerts`, `/setup announcements`, `/setup welcome`, `/language`, `/config`.",
+        inline=False
+    )
+    
+    # Developer Section
+    embed.add_field(
+        name=get_text(lang, "owner_cmds"),
+        value=(
+            "`/broadcast` — Send official announcements\n"
+            "`/status` — Real-time bot diagnostics\n"
+            "`/test` — Mock a version update event\n"
+            "`/reload` — Hot-reload bot tree & cache\n"
+            "`/guilds` — List all active server connections"
+        ),
+        inline=False
+    )
+    
+    embed.set_footer(text="Developer Mode Active", icon_url=bot.user.display_avatar.url)
+    await interaction.followup.send(embed=embed, ephemeral=True)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -1283,19 +1380,43 @@ async def setup_alerts(interaction: discord.Interaction, channel: discord.abc.Gu
     )
     await premium_response(interaction, "Monitor Setup", desc, color=0x2ECC71)
 
-@setup_group.command(name="announcements", description="📢 Set the channel for BloxPulse news and updates.")
-@app_commands.describe(channel="Channel to receive dev updates")
+@setup_group.command(name="announcements", description="⬢ Set the channel for official BloxPulse broadcast updates.")
+@app_commands.describe(channel="The channel where official announcements will be sent.")
+@has_manage_guild()
 async def setup_announcements(interaction: discord.Interaction, channel: discord.abc.GuildChannel):
-    if not hasattr(channel, "send"):
-        return await premium_response(interaction, "Invalid Channel", "Please select a text-based channel.", color=0xE74C3C)
-
-    set_guild_config(interaction.guild_id, "announcement_channel_id", channel.id)
-    desc = (
-        "**✅ Canal de Noticias Configurado**\n\n"
-        f"● **Canal**: {channel.mention}\n\n"
-        "*Aquí recibirás noticias sobre nuevas funciones del bot.*"
+    if not isinstance(channel, discord.TextChannel):
+        return await premium_response(interaction, "❌ Error", "The channel must be a text channel.", color=0xFF0000)
+    
+    set_guild_config(interaction.guild.id, "announcement_channel_id", channel.id)
+    
+    cfg = get_guild_config(interaction.guild.id)
+    lang = cfg.get("language", "en")
+    
+    await premium_response(
+        interaction,
+        get_text(lang, "setup_server_done"),
+        f"↳ **Updates Channel**: {channel.mention}\n\nAll future official broadcasts will be sent there.",
+        color=0x00e5ff
     )
-    await premium_response(interaction, "News Setup", desc, color=0x3498DB)
+
+@setup_group.command(name="welcome", description="⬢ Set the channel for member welcome messages.")
+@app_commands.describe(channel="The channel where welcome messages will be sent.")
+@has_manage_guild()
+async def setup_welcome(interaction: discord.Interaction, channel: discord.abc.GuildChannel):
+    if not isinstance(channel, discord.TextChannel):
+        return await premium_response(interaction, "❌ Error", "The welcome channel must be a text channel.", color=0xFF0000)
+    
+    set_guild_config(interaction.guild.id, "welcome_channel_id", channel.id)
+    
+    cfg = get_guild_config(interaction.guild.id)
+    lang = cfg.get("language", "en")
+    
+    await premium_response(
+        interaction,
+        get_text(lang, "setup_server_done"),
+        f"↳ **Welcome Channel**: {channel.mention}\n\nAll new members will be greeted there with a professional embed.",
+        color=0x00e5ff
+    )
 
 
 @bot.tree.command(name="language", description="Set the default language for update notifications.")
@@ -1405,17 +1526,20 @@ async def config_cmd(interaction: discord.Interaction):
     ch_id     = cfg.get("channel_id")
     role_id   = cfg.get("ping_role_id")
     ann_id    = cfg.get("announcement_channel_id")
+    welcome_id = cfg.get("welcome_channel_id")
     lang      = cfg.get("language", "en")
     lang_names = {"en": "English (US)", "es": "Español (ES)", "pt": "Português (BR)", "ru": "Русский (RU)", "fr": "Français (FR)"}
 
     ch_str   = f"<#{ch_id}>" if ch_id else "`Not configured`"
     role_str = f"<@&{role_id}>" if role_id else "`None`"
     ann_str  = f"<#{ann_id}>" if ann_id else "`Not set`"
+    welcome_str = f"<#{welcome_id}>" if welcome_id else "`Fallback`"
 
     desc = (
         f"↳ **Alerts Channel**: {ch_str}\n"
         f"↳ **Ping Role**: {role_str}\n"
         f"↳ **Updates Channel**: {ann_str}\n"
+        f"↳ **Welcome Channel**: {welcome_str}\n"
         f"↳ **Language**: {lang_names.get(lang, lang)}"
     )
     await premium_response(interaction, "Server Configuration", desc, color=0x3498DB)

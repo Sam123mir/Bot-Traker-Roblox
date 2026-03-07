@@ -167,6 +167,36 @@ def build_update_embed(
         text=f"BloxPulse {BOT_VERSION} · Professional Monitoring | {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC",
         icon_url=avatar_url,
     )
+def build_member_welcome_embed(member: discord.Member, lang: str = "en") -> discord.Embed:
+    """Builds a professional welcome embed for new members."""
+    guild = member.guild
+    server_name = guild.name
+    user_mention = member.mention
+    
+    title = get_text(lang, "welcome_member_title").format(server=server_name)
+    body = get_text(lang, "welcome_member_body").format(user=user_mention)
+    footer_text = get_text(lang, "welcome_member_footer")
+    
+    # Professional cyan color
+    embed = discord.Embed(
+        title=title,
+        description=body,
+        color=0x00e5ff, 
+        timestamp=datetime.now(timezone.utc)
+    )
+    
+    # User icon on the side (Thumbnail)
+    avatar_url = member.display_avatar.url if member.display_avatar else None
+    if avatar_url:
+        embed.set_thumbnail(url=avatar_url)
+        
+    # Server icon in footer
+    icon_url = guild.icon.url if guild.icon else None
+    if icon_url:
+        embed.set_footer(text=footer_text, icon_url=icon_url)
+    else:
+        embed.set_footer(text=footer_text)
+        
     return embed
 
 # ── Dropdown: Language Selector ───────────────────────────────

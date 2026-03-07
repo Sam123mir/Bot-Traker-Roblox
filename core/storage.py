@@ -150,6 +150,7 @@ def get_guild_config(guild_id: int) -> dict:
         "ping_role_id": None,
         "language":     "en",
         "announcement_channel_id": None,
+        "welcome_channel_id": None,
     })
 
 def set_guild_config(guild_id: int, key: str, value) -> bool:
@@ -160,7 +161,8 @@ def set_guild_config(guild_id: int, key: str, value) -> bool:
             "channel_id": None, 
             "ping_role_id": None, 
             "language": "en",
-            "announcement_channel_id": None
+            "announcement_channel_id": None,
+            "welcome_channel_id": None,
         }
     data[gid][key] = value
     return _save_json(GUILDS_FILE, data)
