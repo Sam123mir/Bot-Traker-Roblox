@@ -1,12 +1,8 @@
-# ============================================================
-#   BloxPulse | Roblox Version Monitor — notifier.py
-#   Builds update embeds and interactive dual-dropdown view.
-# ============================================================
-
 import discord
 from discord.ui import View, Select
+import random
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, List
 
 from config import PLATFORMS, BOT_AVATAR_URL, ROBLOX_URL, BOT_VERSION
 from .checker import VersionInfo
@@ -14,6 +10,51 @@ from .i18n import get_text
 from .storage import get_version_data
 
 RDD_BASE = "https://rdd.latte.to"
+
+async def premium_response(
+    interaction: discord.Interaction,
+    title: str,
+    description: str,
+    color: int = 0x5865F2,
+    ephemeral: bool = True,
+    fields: list = None,
+    thumbnail: str = None,
+    bot_icon: str = None
+):
+    """Send a consistent, branded embed response."""
+    embed = discord.Embed(
+        title=f"◈ {title}",
+        description=description,
+        color=color,
+        timestamp=datetime.now(timezone.utc),
+    )
+    if fields:
+        for f in fields:
+            embed.add_field(name=f[0], value=f[1], inline=f[2] if len(f) > 2 else True)
+    
+    avatar_url = bot_icon or BOT_AVATAR_URL
+    
+    if thumbnail:
+        embed.set_thumbnail(url=thumbnail)
+    else:
+        embed.set_thumbnail(url=avatar_url)
+    
+    footers = [
+        "BloxPulse Monitor ⬢",
+        "Global Roblox Tracker ⬢",
+        "Monitoring with Pulse ✨",
+        "Stay updated, stay fast ✨",
+        "Professional Monitoring ◈ BloxPulse"
+    ]
+    embed.set_footer(text=f"{random.choice(footers)}", icon_url=avatar_url)
+    
+    try:
+        if interaction.response.is_done():
+            return await interaction.followup.send(embed=embed, ephemeral=ephemeral)
+        else:
+            return await interaction.response.send_message(embed=embed, ephemeral=ephemeral)
+    except Exception:
+        pass
 
 # ── Helpers ───────────────────────────────────────────────────
 
@@ -40,133 +81,81 @@ def build_update_embed(
     vi: VersionInfo,
     prev_hash: Optional[str],
     lang: str = "en",
-    selected_hash: Optional[str] = None,  # None = show current vi
+    selected_hash: Optional[str] = None,
     bot_icon: Optional[str] = None,
     is_build: bool = False,
     history_data: Optional[list] = None
 ) -> discord.Embed:
-    cfg   = PLATFORMS[platform_key]
+    cfg = PLATFORMS[platform_key]
     label = cfg["label"]
-    gap   = "\u2800" * 4
-
-    # Determine what to display
-    state      = get_version_data(platform_key)
+    
+    state = get_version_data(platform_key)
     timestamps = state.get("timestamps", {})
-    channel    = vi.channel # Get channel from VersionInfo
+    channel = vi.channel
 
     if selected_hash and selected_hash != state.get("current", ""):
-        # Viewing a historical version
-        d_hash    = selected_hash
-        d_short   = d_hash.replace("version-", "")
+        d_hash = selected_hash
+        d_short = d_hash.replace("version-", "")
         d_version = d_short
-        dt_str    = timestamps.get(d_hash, "Unknown date")
+        dt_str = timestamps.get(d_hash, "Unknown date")
         dl_label, dl_url = _download_link(platform_key, d_hash, lang, channel=channel)
-        is_historical = True
     else:
-        # Current version
-        d_hash    = vi.version_hash
-        d_short   = vi.short_hash
+        d_hash = vi.version_hash
+        d_short = vi.short_hash
         d_version = vi.version
-        dt_str    = timestamps.get(d_hash, "Just detected")
+        dt_str = timestamps.get(d_hash, "Just detected")
         dl_label, dl_url = _download_link(platform_key, d_hash, lang, channel=channel)
-        is_historical = False
 
-    # Translated field labels
-    t_ver  = get_text(lang, "version")
+    t_ver = get_text(lang, "version")
     t_plat = get_text(lang, "platform")
     t_hash = get_text(lang, "build_hash")
-    t_dl_h = get_text(lang, "download_header")
+    
+    gap = "\u2800" * 6
 
-    gap = "\u2800" * 6  # Spacing for dual column
-
-    # Final "Side-by-Side" with '|' character style
     if not _is_mobile(platform_key): 
-        # desktop: two columns
         data_block = (
             f"𖤘 **{t_ver}**{gap}{gap}⬢ **{t_plat}**\n"
-            f"| `{d_version}`{gap}| **{label}**\n"
-            f"\n"
+            f"| `{d_version}`{gap}| **{label}**\n\n"
             f"⚿ **{t_hash}**{gap}{gap}🗓️ **Detected**\n"
-            f"| `{d_short}`{gap}| `{dt_str}`\n"
-            f"\n"
+            f"| `{d_short}`{gap}| `{dt_str}`\n\n"
             f"⬢ **Channel**\n"
             f"| `{channel}`"
         )
     else:
-        # mobile: list
         data_block = (
             f"𖤘 **{t_ver}**: | `{d_version}`\n"
             f"⬢ **{t_plat}**: | **{label}**\n"
             f"⚿ **{t_hash}**: | `{d_short}`\n"
-            f"⬢ **Channel**: | `{channel}`\n"
-            f"🗓️ **Detected**: | `{dt_str}`"
+            f"🗓️ **Detected**: | `{dt_str}`\n"
+            f"⬢ **Channel**: | `{channel}`"
         )
-    intro_tag = " — *Historical Build*" if is_historical else ""
-    intro     = (
-        f"{get_text(lang, 'intro_1', platform=label)}\n"
-        f"{get_text(lang, 'intro_2')}{intro_tag}"
-    )
-    description = f"{intro}\n\n{data_block}"
 
-    title = get_text(lang, "update_title", platform=label)
-    color = cfg["color"]
-    
+    title = get_text(lang, "update_title").format(platform=label)
     if is_build:
-        title = f"◈ Build Detected on {label}!"
-        color = 0xF1C40F # Warning Yellow
-        description = (
-            f"**{label} has just built a new version!**\n"
-            f"**THIS IS NOT A ROBLOX UPDATE**\n\n"
-            f"Roblox has just built a new version! This version might be the next update!\n\n"
-            f"{data_block}"
-        )
+        title = f"🛠️ Pre-release Build: {label}"
+
     embed = discord.Embed(
         title=title,
-        description=description,
-        url=ROBLOX_URL,
-        color=color,
+        description=get_text(lang, "intro_1").format(platform=label) + "\n\n" + data_block,
+        color=cfg["color"],
+        timestamp=datetime.now(timezone.utc),
     )
     
-    # LOGOS: Use platform-specific icon for thumbnail, bot avatar for footer
-    platform_icon = cfg.get("icon_url")
-    avatar_url = bot_icon or BOT_AVATAR_URL
-    
-    if platform_icon:
-        embed.set_thumbnail(url=platform_icon)
-    else:
-        embed.set_thumbnail(url=avatar_url)
-    
-    # COMPONENTS: Show detected components from manifest
-    if vi.components:
-        # Identify "key" components (exe, dll, or first few zips)
-        key_items = [c for c in vi.components if c.endswith((".exe", ".dll"))][:5]
-        other_zips = [c for c in vi.components if c.endswith(".zip") and c not in key_items]
-        
-        comp_text = ""
-        if key_items:
-            comp_text += "**Principales:**\n" + "\n".join([f"↳ `{c}`" for c in key_items]) + "\n"
-        
-        if other_zips:
-            comp_text += f"\n**Otros:** `{len(other_zips)}` archivos .zip detectados."
-            
-        embed.add_field(name="⬢ Componentes del Despliegue", value=comp_text or "No se detectaron archivos.", inline=False)
-
     if history_data:
-        history_text = ""
-        for item in history_data:
-            h_short = item["hash"].replace("version-", "")
-            history_text += f"↳ `{h_short}` — {item['date']}\n"
-        embed.add_field(name="⬢ Recent History", value=history_text or "No history", inline=False)
+        h_text = ""
+        for h in history_data:
+            h_short = h['hash'].replace('version-','')[:12]
+            h_text += f"• `{h_short}` — {h['date']}\n"
+        embed.add_field(name=f"🕒 {get_text(lang, 'history_header')}", value=h_text or "No history", inline=False)
 
-    embed.add_field(
-        name=f"*{t_dl_h}*",
-        value=f"**[{dl_label}]({dl_url})**",
-        inline=False,
-    )
-    embed.set_footer(
-        text=f"BloxPulse {BOT_VERSION} · Professional Monitoring | {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC",
-        icon_url=avatar_url,
-    )
+    embed.add_field(name=f"📦 {get_text(lang, 'download_header')}", value=f"**[{dl_label}]({dl_url})**", inline=False)
+    
+    avatar_url = bot_icon or BOT_AVATAR_URL
+    embed.set_footer(text=f"BloxPulse {BOT_VERSION} · Professional Monitoring", icon_url=avatar_url)
+    embed.set_thumbnail(url=cfg["icon_url"])
+    
+    return embed
+
 def build_member_welcome_embed(member: discord.Member, lang: str = "en") -> discord.Embed:
     """Builds a professional welcome embed for new members."""
     guild = member.guild
@@ -177,7 +166,6 @@ def build_member_welcome_embed(member: discord.Member, lang: str = "en") -> disc
     body = get_text(lang, "welcome_member_body").format(user=user_mention)
     footer_text = get_text(lang, "welcome_member_footer")
     
-    # Professional cyan color
     embed = discord.Embed(
         title=title,
         description=body,
@@ -185,12 +173,10 @@ def build_member_welcome_embed(member: discord.Member, lang: str = "en") -> disc
         timestamp=datetime.now(timezone.utc)
     )
     
-    # User icon on the side (Thumbnail)
     avatar_url = member.display_avatar.url if member.display_avatar else None
     if avatar_url:
         embed.set_thumbnail(url=avatar_url)
         
-    # Server icon in footer
     icon_url = guild.icon.url if guild.icon else None
     if icon_url:
         embed.set_footer(text=footer_text, icon_url=icon_url)
@@ -199,108 +185,48 @@ def build_member_welcome_embed(member: discord.Member, lang: str = "en") -> disc
         
     return embed
 
-# ── Dropdown: Language Selector ───────────────────────────────
+def build_announcement_embed(ann_data: dict) -> discord.Embed:
+    """Helper to maintain a consistent style across broadcast and history."""
+    embed = discord.Embed(
+        title=ann_data.get("title", "BloxPulse Update"),
+        description=ann_data.get("content", "No content provided."),
+        color=0x00e5ff,
+        timestamp=datetime.fromisoformat(ann_data.get("timestamp", datetime.now(timezone.utc).isoformat()))
+    )
+    
+    version = ann_data.get("version", "v1.0")
+    footer = ann_data.get("footer", "Thank you for your support!")
+    embed.set_footer(text=f"BloxPulse {version} | {footer}")
+    
+    if ann_data.get("image_url"):
+        embed.set_image(url=ann_data.get("image_url"))
+        
+    return embed
 
-class LanguageSelector(Select):
-    def __init__(self, platform_key: str, vi: VersionInfo, prev_hash: str, lang: str, selected_hash: Optional[str] = None, bot_icon: Optional[str] = None):
-        self.platform_key  = platform_key
-        self.vi            = vi
-        self.prev_hash     = prev_hash
-        self.current_lang  = lang
-        self.selected_hash = selected_hash
-        self.bot_icon      = bot_icon
+# ── Views ──────────────────────────────────────────────────────
 
+class LanguageSelect(Select):
+    def __init__(self, platform_key, vi, prev_hash, current_lang):
         options = [
-            discord.SelectOption(label="English",   value="en"),
-            discord.SelectOption(label="Espanol",   value="es"),
-            discord.SelectOption(label="Portugues", value="pt"),
-            discord.SelectOption(label="Russkiy",   value="ru"),
-            discord.SelectOption(label="Francais",  value="fr"),
+            discord.SelectOption(label="English 🇺🇸",   value="en", default=(current_lang=="en")),
+            discord.SelectOption(label="Español 🇪🇸",   value="es", default=(current_lang=="es")),
+            discord.SelectOption(label="Português 🇧🇷", value="pt", default=(current_lang=="pt")),
+            discord.SelectOption(label="Русский 🇷🇺",   value="ru", default=(current_lang=="ru")),
+            discord.SelectOption(label="Français 🇫🇷",  value="fr", default=(current_lang=="fr")),
         ]
-        super().__init__(placeholder="Change Language", options=options, row=0)
+        super().__init__(placeholder="Change Language", options=options)
+        self.platform_key = platform_key
+        self.vi = vi
+        self.prev_hash = prev_hash
 
     async def callback(self, interaction: discord.Interaction):
         new_lang = self.values[0]
-        embed    = build_update_embed(self.platform_key, self.vi, self.prev_hash, new_lang, self.selected_hash, bot_icon=self.bot_icon)
-        view     = create_language_view(self.platform_key, self.vi, self.prev_hash, new_lang, self.selected_hash, bot_icon=self.bot_icon)
-        await interaction.response.edit_message(embed=embed, view=view)
+        avatar_url = interaction.client.user.display_avatar.url if interaction.client.user else BOT_AVATAR_URL
+        new_embed = build_update_embed(self.platform_key, self.vi, self.prev_hash, lang=new_lang, bot_icon=avatar_url)
+        new_view = create_language_view(self.platform_key, self.vi, self.prev_hash, new_lang)
+        await interaction.response.edit_message(embed=new_embed, view=new_view)
 
-# ── Dropdown: Version History Selector ───────────────────────
-
-class VersionHistorySelector(Select):
-    def __init__(self, platform_key: str, vi: VersionInfo, prev_hash: str, lang: str, selected_hash: Optional[str] = None, bot_icon: Optional[str] = None):
-        self.platform_key  = platform_key
-        self.vi            = vi
-        self.prev_hash     = prev_hash
-        self.lang          = lang
-        self.selected_hash = selected_hash
-        self.bot_icon      = bot_icon
-
-        state      = get_version_data(platform_key)
-        history    = state.get("history", [])
-        current    = state.get("current", "")
-        timestamps = state.get("timestamps", {})
-
-        options = []
-
-        # Current version option
-        curr_date = timestamps.get(current, "Latest")
-        options.append(discord.SelectOption(
-            label=f"Current  —  {curr_date}",
-            value="__current__",
-            description=current.replace("version-", ""),
-            default=(selected_hash is None or selected_hash == current),
-        ))
-
-        # Historical entries
-        for h in history:
-            if h == current:
-                continue
-            date_str = timestamps.get(h, "Unknown date")
-            short    = h.replace("version-", "")
-            options.append(discord.SelectOption(
-                label=f"Previous  —  {date_str}",
-                value=h,
-                description=short,
-                default=(selected_hash == h),
-            ))
-
-        if len(options) == 1:
-            options.append(discord.SelectOption(
-                label="No history recorded yet",
-                value="__none__",
-                description="The bot will track versions from now on",
-            ))
-
-        super().__init__(
-            placeholder="View Previous Version",
-            options=options[:25],  # Discord max
-            row=1,
-        )
-
-    async def callback(self, interaction: discord.Interaction):
-        val = self.values[0]
-        if val == "__none__":
-            await interaction.response.defer()
-            return
-
-        new_sel = None if val == "__current__" else val
-        embed   = build_update_embed(self.platform_key, self.vi, self.prev_hash, self.lang, new_sel, bot_icon=self.bot_icon)
-        view    = create_language_view(self.platform_key, self.vi, self.prev_hash, self.lang, new_sel, bot_icon=self.bot_icon)
-        await interaction.response.edit_message(embed=embed, view=view)
-
-# ── View Factory ──────────────────────────────────────────────
-
-def create_language_view(
-    platform_key: str,
-    vi: VersionInfo,
-    prev_hash: str,
-    current_lang: str = "en",
-    selected_hash: Optional[str] = None,
-    bot_icon: Optional[str] = None,
-) -> View:
-    """Creates the dual-dropdown View (Language + Version History)."""
+def create_language_view(platform_key, vi, prev_hash, current_lang):
     view = View(timeout=None)
-    view.add_item(LanguageSelector(platform_key, vi, prev_hash, current_lang, selected_hash, bot_icon=bot_icon))
-    view.add_item(VersionHistorySelector(platform_key, vi, prev_hash, current_lang, selected_hash, bot_icon=bot_icon))
+    view.add_item(LanguageSelect(platform_key, vi, prev_hash, current_lang))
     return view
