@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from config import DISCORD_BOT_TOKEN, BOT_VERSION, BOT_AVATAR_URL
 from core.storage import get_guild_config
 from core.notifier import premium_response
-from systems.api_service import start_api
+from api import start_api
 
 # ── Logging ──────────────────────────────────────────────────
 _LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
