@@ -12,7 +12,7 @@ from typing import Optional, List
 import random
 import threading
 import math as _math
-from flask import Flask
+from flask import Flask, jsonify, make_response, request
 from dotenv import load_dotenv
 
 # Cargar variables de entorno desde .env si existe
@@ -1548,28 +1548,98 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
 
 # ── Entry Point (Flask + Bot) ─────────────────────────────────
 
+# ── REST API v1 ───────────────────────────────────────────────
+
 app = Flask(__name__)
+
+@app.after_request
+def add_cors_headers(response):
+    """Enable CORS for frontend integration."""
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+    response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
+    return response
 
 @app.route('/')
 def home():
-    uptime = time.time() - bot.start_time
-    h, m, s = int(uptime // 3600), int((uptime % 3600) // 60), int(uptime % 60)
-    
-    # Manejar caso de latencia NaN antes de la conexión inicial
-    latency = "Connecting..."
-    try:
-        if not _math.isnan(bot.latency):
-            latency = f"{round(bot.latency * 1000)}ms"
-    except:
-        pass
+    """Simple health check and redirect info."""
+    return jsonify({
+        "status": "active",
+        "service": "BloxPulse API",
+        "version": BOT_VERSION,
+        "docs": "/api/v1/status"
+    })
 
-    return {
-        "status": "online",
-        "bot": f"BloxPulse {BOT_VERSION}",
-        "uptime": f"{h}h {m}m {s}s",
-        "latency": latency,
-        "guilds": len(bot.guilds)
-    }
+@app.route('/api/v1/status')
+def api_status():
+    """Returns real-time status of all monitored platforms."""
+    status_data = {}
+    for choice, platform_key in _PLATFORM_CHOICES.items():
+        state = get_version_data(platform_key)
+        status_data[platform_key] = {
+            "version": state.get("current", "Unknown"),
+            "hash": state.get("last_update", "Unknown"),
+            "last_build": state.get("last_build", ""),
+            "online": API_STATUS.get(platform_key, True),
+            "updated_at": state.get("timestamps", {}).get(state.get("current"), "Unknown")
+        }
+    return jsonify({
+        "success": True,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "platforms": status_data
+    })
+
+@app.route('/api/v1/stats')
+def api_stats():
+    """Returns global metrics for the landing page."""
+    total_guilds = len(bot.guilds)
+    
+    # Calculate total tracked versions across all history
+    total_versions = 0
+    estimated_members = 0
+    for g in bot.guilds:
+        estimated_members += (g.member_count or 0)
+        
+    for platform_key in _PLATFORM_CHOICES.values():
+        state = get_version_data(platform_key)
+        total_versions += len(state.get("history", []))
+        
+    return jsonify({
+        "success": True,
+        "metrics": {
+            "active_servers": total_guilds,
+            "tracked_versions": total_versions,
+            "estimated_users": estimated_members,
+            "bot_version": BOT_VERSION,
+            "uptime_seconds": int(time.time() - bot.start_time)
+        }
+    })
+
+@app.route('/api/v1/history')
+def api_history():
+    """Returns a consolidated list of the most recent updates."""
+    limit = min(int(request.args.get("limit", 10)), 50)
+    all_updates = []
+    
+    for platform_key in _PLATFORM_CHOICES.values():
+        state = get_version_data(platform_key)
+        timestamps = state.get("timestamps", {})
+        for v_hash, ts in timestamps.items():
+            all_updates.append({
+                "platform": platform_key,
+                "hash": v_hash,
+                "timestamp": ts,
+                "is_current": v_hash == state.get("current")
+            })
+            
+    # Sort by timestamp (descending)
+    # Note: timestamps are saved as strings like "2024-03-05 15:30 UTC"
+    all_updates.sort(key=lambda x: x["timestamp"], reverse=True)
+    
+    return jsonify({
+        "success": True,
+        "updates": all_updates[:limit]
+    })
 
 def run_web_server():
     port = int(_os.environ.get("PORT", 8080))
