@@ -97,7 +97,7 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
 if __name__ == "__main__":
     # Start REST API in the background
     logger.info("Starting REST API v1...")
-    start_api()
+    start_api(bot)
     
     # Run Discord Bot
     logger.info("Starting BloxPulse Bot...")

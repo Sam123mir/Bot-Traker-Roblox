@@ -4,6 +4,7 @@ _BASE = _os.path.dirname(_os.path.abspath(__file__))
 # ── Discord Bot ─────────────────────────────────────────────
 DISCORD_BOT_TOKEN = _os.getenv("DISCORD_BOT_TOKEN", "REPLACE_ME_IN_HOSTING")
 DEVELOPERS       = [1420085090570207313] # ID del usuario dueño/dev
+OFFICIAL_GUILD_ID = 134444555666777888  # Reemplaza con el ID de tu servidor oficial
 DEFAULT_LANGUAGE  = "en" 
 
 # ── Intervalos ────────────────────────────────────────────────

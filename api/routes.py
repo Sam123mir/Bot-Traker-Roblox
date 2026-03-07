@@ -19,12 +19,12 @@ from typing import Any
 from flask import Blueprint, request
 
 # ── Project imports (adjust paths as needed) ──────────────────────────────────
-from config import BOT_VERSION
+from config import BOT_VERSION, OFFICIAL_GUILD_ID, OFFICIAL_SERVER_URL
 from core.storage import get_all_guilds, get_announcements, get_version_data
 from systems.monitoring import API_STATUS
 
 from .config import PLATFORM_MAP, config
-from .errors import BadRequestError, NotFoundError
+from .errors import BadRequestError, NotFoundError, ServiceUnavailableError
 from .response import success, success_list
 
 logger = logging.getLogger("BloxPulse.API")
@@ -34,8 +34,14 @@ logger = logging.getLogger("BloxPulse.API")
 #  Helpers
 # ──────────────────────────────────────────────────────────────────────────────
 
+def _get_bot():
+    """Access the Discord bot instance from Flask current_app."""
+    from flask import current_app
+    return current_app.config.get("BOT")
+
+
 def _serialize_platform(key: str, state: dict) -> dict:
-    """Turn raw storage data into a clean API object for a single platform."""
+# ... (rest of helper functions)
     return {
         "platform":      key,
         "version":       state.get("current") or "unknown",
@@ -78,6 +84,7 @@ def index():
             "status_platform": f"GET {config.API_PREFIX}/status/<platform>",
             "stats":   f"GET {config.API_PREFIX}/stats",
             "history": f"GET {config.API_PREFIX}/history",
+            "widget":  f"GET {config.API_PREFIX}/widget",
             "admin":   f"GET {config.API_PREFIX}/admin/info  (requires API key)",
         },
         "platforms": list(PLATFORM_MAP.keys()),
@@ -238,6 +245,47 @@ def history():
             "has_more":        total > limit,
         },
     )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  /api/v1/widget
+# ──────────────────────────────────────────────────────────────────────────────
+
+widget_bp = Blueprint("widget", __name__, url_prefix=config.API_PREFIX)
+
+
+@widget_bp.get("/widget")
+def widget():
+    """
+    Returns information about the official Discord server to use as a widget.
+    
+    Response body:
+        data: { "name", "icon_url", "member_count", "presence_count", "invite_url" }
+    """
+    bot = _get_bot()
+    if not bot:
+        raise ServiceUnavailableError("Discord bot instance not available.")
+        
+    guild = bot.get_guild(OFFICIAL_GUILD_ID)
+    if not guild:
+        # Fallback if bot is not in the official guild yet or ID is wrong
+        return success({
+            "name":         "BloxPulse Community",
+            "icon_url":     "https://cdn-icons-png.flaticon.com/512/8157/8157523.png",
+            "member_count": 0,
+            "presence_count": 0,
+            "invite_url":   OFFICIAL_SERVER_URL,
+            "status":       "offline"
+        })
+
+    return success({
+        "name":           guild.name,
+        "icon_url":       guild.icon.url if guild.icon else None,
+        "member_count":   guild.member_count,
+        "presence_count": len([m for m in guild.members if m.status != discord.Status.offline]),
+        "invite_url":     OFFICIAL_SERVER_URL,
+        "status":         "online"
+    })
 
 
 # ──────────────────────────────────────────────────────────────────────────────

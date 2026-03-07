@@ -25,7 +25,7 @@ from .config import config
 from .errors import register_error_handlers
 from .logging_setup import setup_api_logging
 from .middleware import register_middleware
-from .routes import admin_bp, health_bp, history_bp, stats_bp, status_bp
+from .routes import admin_bp, health_bp, history_bp, stats_bp, status_bp, widget_bp
 
 logger = logging.getLogger("BloxPulse.API")
 
@@ -34,7 +34,7 @@ logger = logging.getLogger("BloxPulse.API")
 #  App factory
 # ──────────────────────────────────────────────────────────────────────────────
 
-def create_app() -> Flask:
+def create_app(bot: Any = None) -> Flask:
     """
     Build and configure the Flask application.
 
@@ -45,6 +45,7 @@ def create_app() -> Flask:
     app = Flask(__name__)
     app.config["JSON_SORT_KEYS"]     = False   # preserve insertion order
     app.config["PROPAGATE_EXCEPTIONS"] = False  # let our handlers catch everything
+    app.config["BOT"]                = bot     # Store Discord bot instance
 
     # Register components in order: errors → middleware → routes
     register_error_handlers(app)
@@ -54,6 +55,7 @@ def create_app() -> Flask:
     app.register_blueprint(status_bp)
     app.register_blueprint(stats_bp)
     app.register_blueprint(history_bp)
+    app.register_blueprint(widget_bp)
     app.register_blueprint(admin_bp)
 
     logger.info(
@@ -85,7 +87,7 @@ def _run_server(app: Flask) -> None:
     )
 
 
-def start_api() -> None:
+def start_api(bot: Any = None) -> None:
     """
     Create the app and launch it in a daemon background thread.
     Safe to call multiple times – subsequent calls are no-ops.
@@ -96,7 +98,7 @@ def start_api() -> None:
         logger.debug("API server already running – skipping start.")
         return
 
-    app = create_app()
+    app = create_app(bot=bot)
 
     _server_thread = threading.Thread(
         target=_run_server,
