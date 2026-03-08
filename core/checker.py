@@ -119,7 +119,12 @@ def _get(url: str, *, extra_headers: dict | None = None, **kwargs) -> Optional[R
         return resp
     except requests.HTTPError as exc:
         code = exc.response.status_code if exc.response is not None else "?"
-        log.warning("HTTP %s on GET %s", code, url)
+        # We silence 401 (Auth) and 404 (Not Found) as they are common fallbacks
+        if code in (401, 404):
+            log.debug("HTTP %s on GET %s (Expected fallback)", code, url)
+        else:
+            log.warning("HTTP %s on GET %s", code, url)
+        
         if exc.response is not None and exc.response.status_code == 403:
             time.sleep(RETRY_DELAY * 2)   # back off harder on auth failures
     except requests.Timeout:

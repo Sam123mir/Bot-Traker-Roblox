@@ -244,41 +244,49 @@ class WelcomeSystem(commands.Cog):
         """Find and rename the voice channel for tracking member counts."""
         import time
         cfg = get_guild_config(guild.id)
+        count = guild.member_count
+        new_name = f"》 Members: {count}"
+        
+        # 1. Try to get channel by ID from config
         channel_id = cfg.get("member_count_channel_id")
-        if not channel_id:
-            return
-
-        channel = guild.get_channel(channel_id)
+        channel = guild.get_channel(channel_id) if channel_id else None
+        
+        # 2. Fallback: Search for a voice channel with "Members:" in the name
         if not isinstance(channel, discord.VoiceChannel):
+            channel = discord.utils.find(
+                lambda c: isinstance(c, discord.VoiceChannel) and "members:" in c.name.lower(),
+                guild.voice_channels
+            )
+
+        if not channel:
             return
 
         # Permissions check
         if not channel.permissions_for(guild.me).manage_channels:
-            logger.warning(f"BloxPulse: Missing Manage Channels perm to update count in {guild.name}")
+            logger.debug(f"BloxPulse: Missing Manage Channels perm for count channel in {guild.name}")
             return
 
-        count = guild.member_count
-        new_name = f"》 Members: {count}"
-        
         if channel.name != new_name:
             now = time.time()
             last_edit = _last_member_count_edit.get(channel.id, 0.0)
+            
+            # Discord limits: 2 renames per 10 mins. We use 6 mins (360s) for safety.
             if now - last_edit < 360:
-                logger.debug(f"BloxPulse: Skipping member count update for {guild.name} (cooldown)")
+                logger.debug(f"BloxPulse: Skipping member update for {guild.name} (Cooldown: {int(360 - (now-last_edit))}s left)")
                 return
 
             try:
-                await channel.edit(name=new_name)
+                await channel.edit(name=new_name, reason="BloxPulse Member Count Update")
                 _last_member_count_edit[channel.id] = now
-                logger.debug(f"BloxPulse: Updated member count channel in {guild.name} to {count}")
+                logger.info(f"BloxPulse: Updated member count in {guild.name} -> {count}")
             except discord.HTTPException as e:
                 if e.status == 429:
-                    logger.warning(f"BloxPulse: Rate limited when updating member count in {guild.name}. Applying cooldown.")
-                    _last_member_count_edit[channel.id] = now + 300
+                    logger.warning(f"BloxPulse: Rate limited (429) on channel {channel.id}. Backing off.")
+                    _last_member_count_edit[channel.id] = now + 600 # 10 min penalty
                 else:
-                    logger.error(f"BloxPulse: Failed to update count channel in {guild.name}: {e}")
+                    logger.error(f"BloxPulse: HTTP error updating count: {e}")
             except Exception as e:
-                logger.error(f"BloxPulse: Failed to update count channel in {guild.name}: {e}")
+                logger.error(f"BloxPulse: Error updating member count channel: {e}")
 
     async def _trigger_status_update(self, guild: discord.Guild):
         # Update dynamic status if available

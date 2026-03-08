@@ -350,7 +350,13 @@ class MonitoringSystem(commands.Cog):
             for fragment, new_name in desired.items():
                 if fragment.lower() in channel.name.lower() and channel.name != new_name:
                     now = time.time()
-                    last_edit = self._last_channel_edit.get(channel.id, 0.0)
+                    
+                    # Share cooldown with welcome system for member counts
+                    if fragment == "Members:":
+                        from .welcome import _last_member_count_edit
+                        last_edit = _last_member_count_edit.get(channel.id, 0.0)
+                    else:
+                        last_edit = self._last_channel_edit.get(channel.id, 0.0)
                     
                     # Discord limits channel renames to 2 per 10 minutes per channel.
                     # We employ a 360-second (6 min) cooldown to be safe.
@@ -360,7 +366,11 @@ class MonitoringSystem(commands.Cog):
 
                     try:
                         await channel.edit(name=new_name, reason="BloxPulse status update")
-                        self._last_channel_edit[channel.id] = now
+                        if fragment == "Members:":
+                            from .welcome import _last_member_count_edit
+                            _last_member_count_edit[channel.id] = now
+                        else:
+                            self._last_channel_edit[channel.id] = now
                         log.debug("Updated voice channel '%s' → '%s'", channel.name, new_name)
                     except discord.Forbidden:
                         log.warning(
@@ -371,7 +381,12 @@ class MonitoringSystem(commands.Cog):
                         if exc.status == 429:
                             log.warning("Rate limited when updating channel '%s'. Applying cooldown.", channel.name)
                             # If we hit a 429 anyway, force a longer cooldown so we don't spam requests
-                            self._last_channel_edit[channel.id] = now + 300
+                            p_time = now + 600
+                            if fragment == "Members:":
+                                from .welcome import _last_member_count_edit
+                                _last_member_count_edit[channel.id] = p_time
+                            else:
+                                self._last_channel_edit[channel.id] = p_time
                         else:
                             log.warning("Failed to update channel '%s': %s", channel.name, exc)
                     break  # only one fragment can match per channel
