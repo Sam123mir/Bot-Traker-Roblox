@@ -344,10 +344,6 @@ class MonitoringSystem(commands.Cog):
         desired: dict[str, str] = {
             "Members:":    f"》 Members: {guild.member_count}",
             "Bot Version:": f"》 Bot Version: {BOT_VERSION}",
-            "Windows:":    f"》 Windows: {get_latency_emoji(API_LATENCY.get('WindowsPlayer') if API_STATUS.get('WindowsPlayer') else None)}",
-            "Mac:":        f"》 Mac: {get_latency_emoji(API_LATENCY.get('MacPlayer') if API_STATUS.get('MacPlayer') else None)}",
-            "Android:":    f"》 Android: {get_latency_emoji(API_LATENCY.get('AndroidApp') if API_STATUS.get('AndroidApp') else None)}",
-            "iOS:":        f"》 iOS: {get_latency_emoji(API_LATENCY.get('iOS') if API_STATUS.get('iOS') else None)}",
         }
 
         for channel in guild.voice_channels:

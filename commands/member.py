@@ -457,6 +457,46 @@ class MemberCommands(commands.Cog):
     async def donate(self, interaction: discord.Interaction):
         await premium_response(interaction, "Support Us", "PayPal: `Cuentadepruebas750@gmail.com`", color=0x00FFBB)
 
+    @app_commands.command(name="help", description="✨ Discover all the commands BloxPulse has to offer.")
+    async def help_cmd(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        avatar_url = self.bot.user.display_avatar.url if self.bot.user else BOT_AVATAR_URL
+        embed = discord.Embed(
+            title="✨ BloxPulse Help Center",
+            description="Welcome to **BloxPulse**! I am a premium Roblox version tracking bot. Here are the commands you can use:",
+            color=0x3498DB,
+            timestamp=datetime.now(timezone.utc)
+        )
+        
+        embed.add_field(
+            name="👥 Member Commands",
+            value=(
+                "`/version` — Real-time version lookup\n"
+                "`/compare` — Compare past & current versions\n"
+                "`/history` — View past version history\n"
+                "`/ping` — Check bot and Roblox API latency\n"
+                "`/info` — Learn more about BloxPulse\n"
+                "`/rules` — Read community rules\n"
+                "`/donate` — Support our development"
+            ),
+            inline=False
+        )
+        embed.add_field(
+            name="🛡️ Admin Commands",
+            value=(
+                "`/channel update` — Set your version alert channel\n"
+                "`/channel announcements` — Set the broadcast channel\n"
+                "`/language set` — Change the server language\n"
+                "`/autorole` — Assign roles to new members\n"
+                "`/pingrole` — Set the @mention role for updates"
+            ),
+            inline=False
+        )
+        
+        embed.set_thumbnail(url=avatar_url)
+        embed.set_footer(text=f"BloxPulse {BOT_VERSION}", icon_url=avatar_url)
+        await interaction.followup.send(embed=embed)
+
     @app_commands.command(name="rules", description="⚖️ View the community rules or publish them to a channel.")
     @app_commands.describe(channel="Optional: Publish the rules to this channel (requires Manage Guild permissions).")
     async def rules_cmd(self, interaction: discord.Interaction, channel: Optional[discord.TextChannel] = None):
