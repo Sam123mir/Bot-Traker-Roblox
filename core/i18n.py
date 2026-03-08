@@ -38,6 +38,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "welcome_member_title": "✨ ¡Bienvenido a {server}!",
         "welcome_member_body": "⬢ **Hola {user}** ⬢\n\nNos complace darte la bienvenida a nuestra comunidad. ¡Esperamos que disfrutes tu estancia!",
         "welcome_member_footer": "BloxPulse | Monitoreo Profesional",
+        "build_title": "Nueva build de Roblox detectada en {platform}!",
+        "build_disclaimer": "⚠️ ESTO NO ES UNA ACTUALIZACIÓN DE ROBLOX",
+        "build_intro": "*Roblox acaba de compilar una nueva versión! Esta versión podría ser la próxima actualización!*",
     },
     "en": {
         "update_title": "✨ Roblox {platform} Updated!",
@@ -68,6 +71,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "welcome_member_title": "✨ Welcome to {server}!",
         "welcome_member_body": "⬢ **Hello {user}** ⬢\n\nWe are pleased to welcome you to our community. Hope you enjoy your stay!",
         "welcome_member_footer": "BloxPulse | Professional Monitoring",
+        "build_title": "New Roblox build detected on {platform}!",
+        "build_disclaimer": "⚠️ THIS IS NOT A ROBLOX UPDATE",
+        "build_intro": "*Roblox has just built a new version! This version might be the next update!*",
     },
     "pt": {
         "update_title": "✨ Roblox {platform} Atualizado!",

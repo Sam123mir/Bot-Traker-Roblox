@@ -193,8 +193,11 @@ class DeveloperCommands(commands.Cog):
             bot_icon=avatar_url
         )
 
-    @app_commands.command(name="test", description="Send a preview of the latest update embed (Owner only).")
-    @app_commands.describe(platform="Platform to preview")
+    @app_commands.command(name="test", description="Send a preview of the latest update or build embed (Owner only).")
+    @app_commands.describe(
+        platform="Platform to preview",
+        is_build="Force the 'New Build Detected' style warning"
+    )
     @app_commands.choices(platform=[
         app_commands.Choice(name="Windows", value="windows"),
         app_commands.Choice(name="macOS",   value="mac"),
@@ -202,7 +205,7 @@ class DeveloperCommands(commands.Cog):
         app_commands.Choice(name="iOS",     value="ios"),
     ])
     @is_owner()
-    async def test(self, interaction: discord.Interaction, platform: str):
+    async def test(self, interaction: discord.Interaction, platform: str, is_build: bool = False):
         await interaction.response.defer(ephemeral=True)
         
         platform_key = API_PLATFORM_MAPPING[platform]
@@ -215,7 +218,19 @@ class DeveloperCommands(commands.Cog):
 
         loop = asyncio.get_event_loop()
         
-        if curr_hash:
+        # Priority: Try to fetch fresh data from MaximumADHD API for the test
+        versions = await loop.run_in_executor(None, fetch_all)
+        vi = versions.get(platform_key)
+        
+        if vi:
+            # Found fresh data
+            prev_hash = vi.version_hash # For test, same is fine or we can look up history
+            state = get_version_data(platform_key)
+            hist = state.get("history", [])
+            if hist:
+                prev_hash = hist[0]
+        elif curr_hash:
+            # Fallback to stored data
             vi = VersionInfo(
                 platform_key=platform_key,
                 version=curr_hash.replace("version-", ""),
@@ -224,14 +239,10 @@ class DeveloperCommands(commands.Cog):
                 source=f"Stored · {platform_key}",
             )
         else:
-            versions = await loop.run_in_executor(None, fetch_all)
-            vi = versions.get(platform_key)
-            if not vi:
-                return await interaction.followup.send("No version data found for this platform.")
-            prev_hash = vi.version_hash
+            return await interaction.followup.send("No version data found for this platform.")
 
         avatar_url = self.bot.user.display_avatar.url if self.bot.user else BOT_AVATAR_URL
-        embed = build_update_embed(platform_key, vi, prev_hash, lang=lang, bot_icon=avatar_url)
+        embed = build_update_embed(platform_key, vi, prev_hash, lang=lang, bot_icon=avatar_url, is_build=is_build)
         view = create_language_view(platform_key, vi, prev_hash, lang)
         
         # Bug fix: Merged "Preview Sent" into a cleaner single response

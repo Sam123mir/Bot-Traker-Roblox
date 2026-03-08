@@ -299,7 +299,11 @@ def build_update_embed(
 
     # ── Title ─────────────────────────────────────────────────────────────────
     # Screenshot header: "Roblox {platform} Updated!"
-    title = f"Roblox {ctx.label} Updated!"
+    if is_build:
+        title = get_text(lang, "build_title", platform=ctx.label)
+    else:
+        title = f"Roblox {ctx.label} Updated!"
+
     if channel != "LIVE":
         title += f" [{channel}]"
     
@@ -310,8 +314,13 @@ def build_update_embed(
     )
 
     # ── Description ───────────────────────────────────────────────────────────
-    # Screenshot intro text (italicized)
-    intro = f"*Roblox has deployed a new build for **{ctx.label}**.*\n*This version is now operational on production servers.*"
+    if is_build:
+        disclaimer = f"**{get_text(lang, 'build_disclaimer')}**"
+        intro = f"{disclaimer}\n\n{get_text(lang, 'build_intro')}"
+    else:
+        # Screenshot intro text (italicized)
+        intro = f"*Roblox has deployed a new build for **{ctx.label}**.*\n*This version is now operational on production servers.*"
+
     data_block = _build_data_block(ctx, lang, vi.fflag_count)
     
     embed.description = f"{intro}\n\n{data_block}"

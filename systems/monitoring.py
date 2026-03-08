@@ -151,7 +151,7 @@ class MonitoringSystem(commands.Cog):
                     self._update_local_state(platform_key, channel, vi)
                     
                     broadcasts.append(
-                        self._broadcast(platform_key, vi, prev_hash=old_hash, is_build=False, channel=channel)
+                        self._broadcast(platform_key, vi, prev_hash=old_hash, is_build=(channel != "LIVE"), channel=channel)
                     )
 
         if broadcasts:
