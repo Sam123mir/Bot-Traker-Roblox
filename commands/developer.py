@@ -278,5 +278,19 @@ class DeveloperCommands(commands.Cog):
         avatar_url = self.bot.user.display_avatar.url if self.bot.user else BOT_AVATAR_URL
         await premium_response(interaction, f"Active Guilds ({len(self.bot.guilds)})", desc, color=0x9B59B6, bot_icon=avatar_url)
 
+    @app_commands.command(name="sync", description="Sync and clear ghost commands globally (Owner only).")
+    @is_owner()
+    async def sync_cmds(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        try:
+            # Clear guild-specific commands that might be lurking
+            self.bot.tree.clear_commands(guild=interaction.guild)
+            await self.bot.tree.sync(guild=interaction.guild)
+            # Sync global commands
+            synced = await self.bot.tree.sync()
+            await interaction.followup.send(f"✅ Synced {len(synced)} global commands. Guild cache cleared.", ephemeral=True)
+        except Exception as e:
+            await interaction.followup.send(f"❌ Error syncing: `{e}`", ephemeral=True)
+
 async def setup(bot):
     await bot.add_cog(DeveloperCommands(bot))

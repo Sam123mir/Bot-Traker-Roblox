@@ -140,7 +140,7 @@ class MonitoringSystem(commands.Cog):
                 
                 if not old_hash:
                     log.info("Initialising [%s:%s] version → %s", platform_key, channel, current_hash)
-                    self._update_local_state(platform_key, channel, vi)
+                    await self._update_local_state(platform_key, channel, vi)
                 
                 elif is_version_change or is_fflag_change:
                     if is_version_change:
@@ -148,7 +148,7 @@ class MonitoringSystem(commands.Cog):
                     if is_fflag_change:
                         log.info("🛠️ FFlag change [%s:%s]: %d → %d", platform_key, channel, old_fflags, current_flags)
 
-                    self._update_local_state(platform_key, channel, vi)
+                    await self._update_local_state(platform_key, channel, vi)
                     
                     broadcasts.append(
                         self._broadcast(platform_key, vi, prev_hash=old_hash, is_build=(channel != "LIVE"), channel=channel)
