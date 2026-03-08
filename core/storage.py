@@ -297,7 +297,7 @@ def update_version(
     return ok
 
 
-def backfill_history(platform_key: str, entries: list) -> int:
+def backfill_history(platform_key: str, entries: list, channel: str = "LIVE") -> int:
     """
     Populate the database with historical HistoryEntry objects (or plain dicts).
 
@@ -313,16 +313,19 @@ def backfill_history(platform_key: str, entries: list) -> int:
     if not entries:
         return 0
 
+    added = 0
+    key = f"{platform_key}:{channel}" if channel != "LIVE" else platform_key
+
     # Sort ascending so newest ends up at index 0 after insert
     try:
         sorted_entries = sorted(entries, key=lambda e: getattr(e, "timestamp", None) or e["timestamp"])
     except (TypeError, KeyError) as exc:
-        log.error("backfill_history: cannot sort entries for %s: %s", platform_key, exc)
+        log.error("backfill_history: cannot sort entries for %s: %s", key, exc)
         return 0
 
     with _lock_for(VERSIONS_FILE):
         full_data = _load_json(VERSIONS_FILE)
-        state     = _migrate_version_state(full_data.get(platform_key))
+        state     = _migrate_version_state(full_data.get(key))
         history:    list[str]      = state["history"]
         timestamps: dict[str, str] = state["timestamps"]
 
