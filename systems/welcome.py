@@ -231,6 +231,9 @@ async def _find_welcome_channel(guild: discord.Guild, cfg: dict, key: str = "wel
 #  COG
 # ──────────────────────────────────────────────
 
+# Dict to track last update time per channel to prevent rate limits
+_last_member_count_edit: dict[int, float] = {}
+
 class WelcomeSystem(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -239,6 +242,7 @@ class WelcomeSystem(commands.Cog):
 
     async def _update_member_count_channel(self, guild: discord.Guild):
         """Find and rename the voice channel for tracking member counts."""
+        import time
         cfg = get_guild_config(guild.id)
         channel_id = cfg.get("member_count_channel_id")
         if not channel_id:
@@ -257,11 +261,22 @@ class WelcomeSystem(commands.Cog):
         new_name = f"》 Members: {count}"
         
         if channel.name != new_name:
+            now = time.time()
+            last_edit = _last_member_count_edit.get(channel.id, 0.0)
+            if now - last_edit < 360:
+                logger.debug(f"BloxPulse: Skipping member count update for {guild.name} (cooldown)")
+                return
+
             try:
                 await channel.edit(name=new_name)
+                _last_member_count_edit[channel.id] = now
                 logger.debug(f"BloxPulse: Updated member count channel in {guild.name} to {count}")
-            except discord.RateLimited:
-                pass # Silent ignore, will catch up next time
+            except discord.HTTPException as e:
+                if e.status == 429:
+                    logger.warning(f"BloxPulse: Rate limited when updating member count in {guild.name}. Applying cooldown.")
+                    _last_member_count_edit[channel.id] = now + 300
+                else:
+                    logger.error(f"BloxPulse: Failed to update count channel in {guild.name}: {e}")
             except Exception as e:
                 logger.error(f"BloxPulse: Failed to update count channel in {guild.name}: {e}")
 
