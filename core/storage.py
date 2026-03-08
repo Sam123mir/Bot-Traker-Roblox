@@ -155,7 +155,11 @@ def _save_json(path: str, data: dict) -> bool:
     The caller is responsible for holding the appropriate lock.
     Returns True on success.
     """
-    os.makedirs(os.path.dirname(path), exist_ok=True)
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+    except OSError as e:
+        log.error("Failed to create parent directory for %s: %s", path, e)
+        
     tmp = path + ".tmp"
     try:
         with open(tmp, "w", encoding="utf-8") as fh:
