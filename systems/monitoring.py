@@ -26,7 +26,7 @@ import discord
 from discord.ext import commands, tasks
 
 from config import BOT_AVATAR_URL, BOT_VERSION, CHECK_INTERVAL
-from core.checker import VersionInfo, fetch_all
+from core.checker import VersionInfo, fetch_all, fetch_version
 from core.history import HistoryEntry, fetch_deploy_history
 from core.notifier import build_update_embed, create_language_view
 from core.storage import get_all_guilds, get_version_data, update_version

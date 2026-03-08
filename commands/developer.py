@@ -17,7 +17,7 @@ from discord.ext import commands
 from config import API_PLATFORM_MAPPING, BOT_AVATAR_URL, BOT_VERSION, CHECK_INTERVAL, DEVELOPERS, PLATFORMS
 from core.checker import VersionInfo, fetch_all
 from core.i18n import get_text
-from core.notifier import build_announcement_embed, build_update_embed, create_language_view, premium_response
+from core.notifier import build_announcement_embed, build_update_embed, build_alert_view, create_language_view, premium_response
 from core.perms import is_owner
 from core.storage import get_all_guilds, get_guild_config, get_version_data, save_announcement
 
