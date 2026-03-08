@@ -164,6 +164,21 @@ class MonitoringSystem(commands.Cog):
 
     async def _update_local_state(self, platform_key: str, channel: str, vi: VersionInfo) -> None:
         """Helper to sync storage with discovered VersionInfo."""
+        from core.storage import backfill_history
+        from core.history import fetch_deploy_history
+        
+        state = get_version_data(platform_key, channel=channel)
+        if not state.get("history") and channel == "LIVE":
+            try:
+                loop = asyncio.get_running_loop()
+                # Fetch 30 days of history off the event loop 
+                history_entries = await loop.run_in_executor(None, fetch_deploy_history, platform_key, 30)
+                if history_entries:
+                    backfill_history(platform_key, [e.as_dict() for e in history_entries])
+                    log.info("Backfilled %d historical entries for %s", len(history_entries), platform_key)
+            except Exception as e:
+                log.warning("Failed to backfill history for %s: %s", platform_key, e)
+                
         update_version(platform_key, vi.version_hash, is_official=True, channel=channel, fflag_count=vi.fflag_count)
         # We need a new storage method or update update_version to store fflag_count
         # For now, let's assume update_version handles it or we'll add it.
