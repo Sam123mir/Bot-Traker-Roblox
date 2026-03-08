@@ -67,40 +67,6 @@ class AdminCommands(commands.Cog):
             color=0x00e5ff
         )
 
-    @setup_group.command(name="welcome", description="⬢ Set the channel for member welcome messages.")
-    @app_commands.describe(channel="The channel where welcome messages will be sent.")
-    @has_manage_guild()
-    async def setup_welcome(self, interaction: discord.Interaction, channel: discord.abc.GuildChannel):
-        if not isinstance(channel, discord.TextChannel):
-            return await premium_response(interaction, "❌ Error", "Must be a text channel.", color=0xFF0000)
-        
-        set_guild_config(interaction.guild.id, "welcome_channel_id", channel.id)
-        cfg = get_guild_config(interaction.guild.id)
-        lang = cfg.get("language", "en")
-        
-        await premium_response(
-            interaction,
-            get_text(lang, "setup_server_done"),
-            f"↳ **Welcome Channel**: {channel.mention}\n\nNew members will be greeted here professionally.",
-            color=0x00e5ff
-        )
-
-    @setup_group.command(name="goodbye", description="⬢ Set the channel for member goodbye messages.")
-    @app_commands.describe(channel="The channel where goodbye messages will be sent.")
-    @has_manage_guild()
-    async def setup_goodbye(self, interaction: discord.Interaction, channel: discord.abc.GuildChannel):
-        if not isinstance(channel, discord.TextChannel):
-            return await premium_response(interaction, "❌ Error", "Must be a text channel.", color=0xFF0000)
-        
-        set_guild_config(interaction.guild.id, "welcome_channel_id", channel.id) # Fallback to welcome channel or same logic
-        set_guild_config(interaction.guild.id, "goodbye_enabled", True)
-        
-        await premium_response(
-            interaction,
-            "Goodbye Setup",
-            f"↳ **Goodbye Messages**: {channel.mention}\n\nVisible when members leave the server.",
-            color=0x00e5ff
-        )
 
     @setup_group.command(name="member-count", description="👥 Set the voice channel for the real-time member count.")
     @app_commands.describe(channel="Voice channel to rename with the member count")
@@ -198,27 +164,27 @@ class AdminCommands(commands.Cog):
         except Exception as e:
             await interaction.followup.send(f"❌ Error during setup: `{e}`", ephemeral=True)
 
-    @app_commands.command(name="welcome_system", description="⚙️ Configure the welcome and goodbye system.")
+    welcome_group = app_commands.Group(name="welcome", description="👋 Configure the professional welcome and goodbye system.")
+
+    @welcome_group.command(name="setup", description="⚙️ Configure channels for welcome/goodbye messages.")
     @app_commands.describe(
         welcome_channel="Channel for welcome messages",
         goodbye_channel="Channel for goodbye messages",
         enabled="Enable or disable the system"
     )
     @has_manage_guild()
-    async def welcome_system(
+    async def welcome_setup(
         self, 
         interaction: discord.Interaction, 
         welcome_channel: Optional[discord.TextChannel] = None,
         goodbye_channel: Optional[discord.TextChannel] = None,
         enabled: bool = True
     ):
-        updates = {}
+        updates = {"goodbye_enabled": enabled}
         if welcome_channel:
             updates["welcome_channel_id"] = welcome_channel.id
         if goodbye_channel:
             updates["goodbye_channel_id"] = goodbye_channel.id
-        
-        updates["goodbye_enabled"] = enabled
         
         from core.storage import set_guild_config_bulk
         set_guild_config_bulk(interaction.guild.id, updates)
@@ -226,11 +192,14 @@ class AdminCommands(commands.Cog):
         await premium_response(
             interaction, 
             "Welcome System Updated", 
-            f"✅ Configuration saved.\n↳ Welcome: {welcome_channel.mention if welcome_channel else '`Unchanged`'}\n↳ Goodbye: {enabled}",
+            f"✅ Configuration saved.\n"
+            f"↳ **Welcome**: {welcome_channel.mention if welcome_channel else '`Unchanged`'}\n"
+            f"↳ **Goodbye**: {goodbye_channel.mention if goodbye_channel else '`Unchanged`'}\n"
+            f"↳ **Status**: {'`Enabled`' if enabled else '`Disabled`'}",
             color=0x00E5FF
         )
 
-    @app_commands.command(name="welcome_test", description="🧪 Test the welcome message in a channel.")
+    @welcome_group.command(name="test", description="🧪 Test the welcome message in a channel.")
     @app_commands.describe(channel="Target channel for the test")
     @has_manage_guild()
     async def welcome_test(self, interaction: discord.Interaction, channel: discord.TextChannel):

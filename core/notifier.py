@@ -296,6 +296,15 @@ def build_update_embed(
     -------
     discord.Embed ready to send.
     """
+    if not history_data and not is_build:
+        state = get_version_data(platform_key, channel=channel) or {}
+        history = state.get("history", [])
+        timestamps = state.get("timestamps", {})
+        history_data = [
+            {"hash": h, "date": timestamps.get(h, "Unknown")}
+            for h in history[:5]
+        ]
+
     ctx   = _resolve_context(platform_key, vi, lang, selected_hash)
     avatar = _avatar(bot_icon)
 
@@ -592,6 +601,7 @@ class LanguageSelect(Select):
         vi:            VersionInfo,
         prev_hash:     Optional[str],
         current_lang:  str,
+        current_hash:  Optional[str] = None,
     ) -> None:
         options = [
             discord.SelectOption(
@@ -611,6 +621,7 @@ class LanguageSelect(Select):
         self.platform_key = platform_key
         self.vi           = vi
         self.prev_hash    = prev_hash
+        self.current_hash = current_hash
 
     async def callback(self, interaction: discord.Interaction) -> None:
         new_lang   = self.values[0]
@@ -622,14 +633,99 @@ class LanguageSelect(Select):
         new_embed  = build_update_embed(
             self.platform_key, self.vi, self.prev_hash,
             lang=new_lang, bot_icon=bot_icon,
+            selected_hash=self.current_hash,
+            channel=self.vi.channel
         )
-        new_view   = create_language_view(
-            self.platform_key, self.vi, self.prev_hash, new_lang
+        new_view   = build_alert_view(
+            self.platform_key, self.vi, self.prev_hash, new_lang, self.current_hash
         )
         try:
             await interaction.response.edit_message(embed=new_embed, view=new_view)
         except discord.HTTPException as exc:
             log.error("LanguageSelect.callback: edit_message failed: %s", exc)
+
+
+class VersionSelect(Select):
+    """Dropdown to view historical version details."""
+
+    def __init__(
+        self,
+        platform_key: str,
+        vi:           VersionInfo,
+        prev_hash:    Optional[str],
+        current_lang: str,
+        current_hash: Optional[str] = None,
+    ) -> None:
+        state = get_version_data(platform_key, channel=vi.channel) or {}
+        history = (state.get("history") or [])[:]
+        
+        # Ensure latest/current is at the top
+        latest = state.get("current", "")
+        if latest and latest not in history:
+            history.insert(0, latest)
+            
+        cur = current_hash or latest
+        
+        options = [
+            discord.SelectOption(
+                label=h.replace("version-", ""),
+                value=h,
+                default=(h == cur),
+            )
+            for h in history[:25]
+        ]
+        
+        super().__init__(
+            placeholder="Select historical version...",
+            min_values=1,
+            max_values=1,
+            options=options,
+        )
+        self.platform_key = platform_key
+        self.vi           = vi
+        self.prev_hash    = prev_hash
+        self.lang         = current_lang
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        selected_hash = self.values[0]
+        bot_icon = (
+            interaction.client.user.display_avatar.url
+            if interaction.client.user
+            else BOT_AVATAR_URL
+        )
+        
+        new_embed = build_update_embed(
+            self.platform_key, self.vi, self.prev_hash,
+            lang=self.lang, selected_hash=selected_hash,
+            bot_icon=bot_icon, channel=self.vi.channel
+        )
+        new_view = build_alert_view(
+            self.platform_key, self.vi, self.prev_hash, self.lang, selected_hash
+        )
+        try:
+            await interaction.response.edit_message(embed=new_embed, view=new_view)
+        except discord.HTTPException as exc:
+            log.error("VersionSelect.callback: edit_message failed: %s", exc)
+
+
+def build_alert_view(
+    platform_key:  str,
+    vi:            VersionInfo,
+    prev_hash:     Optional[str],
+    current_lang:  str = "en",
+    current_hash:  Optional[str] = None,
+) -> View:
+    """Return a persistent View containing both language and version selectors."""
+    view = View(timeout=None)
+    view.add_item(LanguageSelect(platform_key, vi, prev_hash, current_lang, current_hash))
+    
+    state = get_version_data(platform_key, channel=vi.channel) or {}
+    if state.get("history") or state.get("current"):
+        view.add_item(VersionSelect(
+            platform_key, vi, prev_hash, current_lang, current_hash
+        ))
+    
+    return view
 
 
 def create_language_view(
@@ -638,7 +734,5 @@ def create_language_view(
     prev_hash:     Optional[str],
     current_lang:  str = "en",
 ) -> View:
-    """Return a persistent View containing the language selector."""
-    view = View(timeout=None)
-    view.add_item(LanguageSelect(platform_key, vi, prev_hash, current_lang))
-    return view
+    """Backward-compatible wrapper for build_alert_view."""
+    return build_alert_view(platform_key, vi, prev_hash, current_lang)

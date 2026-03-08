@@ -243,15 +243,13 @@ class DeveloperCommands(commands.Cog):
 
         avatar_url = self.bot.user.display_avatar.url if self.bot.user else BOT_AVATAR_URL
         embed = build_update_embed(platform_key, vi, prev_hash, lang=lang, bot_icon=avatar_url, is_build=is_build)
-        view = create_language_view(platform_key, vi, prev_hash, lang)
+        view = build_alert_view(platform_key, vi, prev_hash, lang)
         
-        # Bug fix: Merged "Preview Sent" into a cleaner single response
-        embed.title = f"🧪 PREVIEW: {embed.title}"
+        # Real-world behavior: No test prefixes, no extra content
         await interaction.followup.send(
-            content=f"⬢ **Developer Preview Generated** for {PLATFORMS[platform_key]['label']}",
             embed=embed,
             view=view,
-            ephemeral=True
+            ephemeral=False  # Make it visible to everyone in the channel for testing
         )
 
     @app_commands.command(name="reload", description="Force an immediate version check (Owner only).")
