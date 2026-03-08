@@ -519,6 +519,15 @@ def notify_startup(versions: dict[str, Optional[VersionInfo]]) -> None:
             )
 
 
+def notify_error(traceback_str: str) -> None:
+    """
+    Log a critical error from the monitoring cycle.
+    In the standalone monitor, this just logs to file/console.
+    In the Discord system, errors are broadcast to the developer guild.
+    """
+    log.critical("Monitor check cycle encountered an unhandled exception:\n%s", traceback_str)
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 #  Language selector UI
 # ──────────────────────────────────────────────────────────────────────────────
