@@ -9,6 +9,7 @@ import asyncio
 import random
 import time
 from datetime import datetime, timezone
+from typing import Optional
 
 import aiohttp
 import discord
@@ -458,7 +459,7 @@ class MemberCommands(commands.Cog):
 
     @app_commands.command(name="rules", description="⚖️ View the community rules or publish them to a channel.")
     @app_commands.describe(channel="Optional: Publish the rules to this channel (requires Manage Guild permissions).")
-    async def rules_cmd(self, interaction: discord.Interaction, channel: discord.TextChannel = None):
+    async def rules_cmd(self, interaction: discord.Interaction, channel: Optional[discord.TextChannel] = None):
         """Displays server rules. If channel is provided, posts publicly (Admins only)."""
         lang = get_guild_config(interaction.guild_id).get("language", "en")
         
