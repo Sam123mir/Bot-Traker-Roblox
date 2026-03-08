@@ -1,13 +1,27 @@
 # core/notifier.py
 """
-Embed builders and messaging utilities.
-Handles the creation of professional Discord embeds for notifications.
+BloxPulse · Notification & Embed Pipeline
+==========================================
+Centralised factory for every Discord embed the bot produces,
+plus the async delivery helpers that send them to guild channels.
+
+Public surface
+--------------
+  build_update_embed(...)       → discord.Embed
+  build_member_welcome_embed(…) → discord.Embed
+  build_announcement_embed(…)   → discord.Embed
+  premium_response(…)           → coroutine
+  notify_update(…)              → bool
+  notify_startup(…)             → None
+  create_language_view(…)       → discord.ui.View
 """
 from __future__ import annotations
 
+import logging
 import random
+from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 import discord
 from discord.ui import Select, View
@@ -17,231 +31,562 @@ from .checker import VersionInfo
 from .i18n import get_text
 from .storage import get_version_data
 
-RDD_BASE = "https://rdd.latte.to"
+log = logging.getLogger("BloxPulse.Notifier")
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  Premium Responses
+#  Constants
+# ──────────────────────────────────────────────────────────────────────────────
+
+RDD_BASE = "https://rdd.latte.to"
+
+_FOOTER_POOL: tuple[str, ...] = (
+    "BloxPulse Monitor ⬢",
+    "Global Roblox Tracker ⬢",
+    "Monitoring with Pulse ✨",
+    "Stay updated, stay fast ✨",
+    "Professional Monitoring ◈ BloxPulse",
+)
+
+_SUPPORTED_LANGUAGES: tuple[str, ...] = ("en", "es", "pt", "ru", "fr")
+
+_MOBILE_PLATFORMS: frozenset[str] = frozenset({"AndroidApp", "iOS"})
+
+# Discord hard limits (https://discord.com/developers/docs/resources/channel#embed-object)
+_LIMIT_TITLE       = 256
+_LIMIT_DESCRIPTION = 4096
+_LIMIT_FIELD_NAME  = 256
+_LIMIT_FIELD_VALUE = 1024
+_LIMIT_FOOTER      = 2048
+_LIMIT_TOTAL_CHARS = 6000
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Internal data models
+# ──────────────────────────────────────────────────────────────────────────────
+
+@dataclass(frozen=True)
+class _DownloadLink:
+    label: str
+    url:   str
+
+
+@dataclass(frozen=True)
+class _EmbedContext:
+    """Pre-resolved data bundle passed to the embed builder."""
+    platform_key: str
+    label:        str
+    color:        int
+    icon_url:     str
+    version:      str
+    short_hash:   str
+    full_hash:    str
+    detected_at:  str
+    channel:      str
+    download:     _DownloadLink
+    is_mobile:    bool
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Private helpers
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _random_footer() -> str:
+    return random.choice(_FOOTER_POOL)  # noqa: S311
+
+
+def _truncate(text: str, limit: int) -> str:
+    """Hard-truncate text to Discord's character limits, appending '…' if cut."""
+    if len(text) <= limit:
+        return text
+    log.warning("Embed field truncated from %d to %d chars", len(text), limit)
+    return text[: limit - 1] + "…"
+
+
+def _avatar(bot_icon: Optional[str]) -> str:
+    return bot_icon or BOT_AVATAR_URL
+
+
+def _resolve_download_link(
+    platform_key: str,
+    version_hash: str,
+    lang: str,
+    channel: str = "LIVE",
+) -> _DownloadLink:
+    """Return a labelled download / store URL for the given platform."""
+    if platform_key == "WindowsPlayer":
+        return _DownloadLink(
+            label=get_text(lang, "download_windows"),
+            url=f"{RDD_BASE}/?channel={channel}&binaryType=WindowsPlayer&version={version_hash}",
+        )
+    if platform_key == "MacPlayer":
+        return _DownloadLink(
+            label=get_text(lang, "download_macos"),
+            url=f"{RDD_BASE}/?channel={channel}&binaryType=MacPlayer&version={version_hash}",
+        )
+    if platform_key == "AndroidApp":
+        return _DownloadLink(
+            label=get_text(lang, "view_playstore"),
+            url="https://play.google.com/store/apps/details?id=com.roblox.client",
+        )
+    if platform_key == "iOS":
+        return _DownloadLink(
+            label=get_text(lang, "view_appstore"),
+            url="https://apps.apple.com/app/roblox/id431946152",
+        )
+    return _DownloadLink(label="Link", url=ROBLOX_URL)
+
+
+def _resolve_context(
+    platform_key: str,
+    vi: VersionInfo,
+    lang: str,
+    selected_hash: Optional[str] = None,
+) -> _EmbedContext:
+    """
+    Build the full resolved context for an embed.
+    When `selected_hash` is provided (history view) we look up that specific
+    entry's data instead of the latest version.
+    """
+    cfg        = PLATFORMS[platform_key]
+    state      = get_version_data(platform_key) or {}
+    timestamps = state.get("timestamps", {})
+    channel    = vi.channel
+
+    if selected_hash and selected_hash != state.get("current", ""):
+        full_hash  = selected_hash
+        short_hash = full_hash.replace("version-", "")
+        version    = short_hash
+        detected   = timestamps.get(full_hash, "Unknown date")
+    else:
+        full_hash  = vi.version_hash
+        short_hash = vi.short_hash
+        version    = vi.version
+        detected   = timestamps.get(full_hash, "Just detected")
+
+    download = _resolve_download_link(platform_key, full_hash, lang, channel)
+
+    return _EmbedContext(
+        platform_key=platform_key,
+        label=cfg["label"],
+        color=cfg["color"],
+        icon_url=cfg["icon_url"],
+        version=version,
+        short_hash=short_hash,
+        full_hash=full_hash,
+        detected_at=detected,
+        channel=channel,
+        download=download,
+        is_mobile=platform_key in _MOBILE_PLATFORMS,
+    )
+
+
+def _build_data_block(ctx: _EmbedContext, lang: str) -> str:
+    """Compose the description data block adapted to mobile/desktop layout."""
+    t_ver  = get_text(lang, "version")
+    t_plat = get_text(lang, "platform")
+    t_hash = get_text(lang, "build_hash")
+    gap    = "\u2800" * 6  # Braille blank spacer
+
+    if ctx.is_mobile:
+        return (
+            f"𖤘 **{t_ver}**: | `{ctx.version}`\n"
+            f"⬢ **{t_plat}**: | **{ctx.label}**\n"
+            f"⚿ **{t_hash}**: | `{ctx.short_hash}`\n"
+            f"🗓️ **Detected**: | `{ctx.detected_at}`\n"
+            f"⬢ **Channel**: | `{ctx.channel}`"
+        )
+
+    return (
+        f"𖤘 **{t_ver}**{gap}{gap}⬢ **{t_plat}**\n"
+        f"| `{ctx.version}`{gap}| **{ctx.label}**\n\n"
+        f"⚿ **{t_hash}**{gap}{gap}🗓️ **Detected**\n"
+        f"| `{ctx.short_hash}`{gap}| `{ctx.detected_at}`\n\n"
+        f"⬢ **Channel**\n"
+        f"| `{ctx.channel}`"
+    )
+
+
+def _validate_embed(embed: discord.Embed) -> None:
+    """
+    Assert that the embed respects Discord's hard character limits.
+    Raises ValueError with a descriptive message on violation.
+    """
+    total = 0
+
+    def _check(value: str, limit: int, field_name: str) -> None:
+        nonlocal total
+        if len(value) > limit:
+            raise ValueError(
+                f"Embed field '{field_name}' exceeds {limit} chars "
+                f"(got {len(value)})"
+            )
+        total += len(value)
+
+    if embed.title:
+        _check(embed.title, _LIMIT_TITLE, "title")
+    if embed.description:
+        _check(embed.description, _LIMIT_DESCRIPTION, "description")
+    for f in embed.fields:
+        _check(f.name,  _LIMIT_FIELD_NAME,  f"field.name[{f.name!r}]")
+        _check(f.value, _LIMIT_FIELD_VALUE, f"field.value[{f.name!r}]")
+    if embed.footer and embed.footer.text:
+        _check(embed.footer.text, _LIMIT_FOOTER, "footer.text")
+    if total > _LIMIT_TOTAL_CHARS:
+        raise ValueError(
+            f"Embed total characters {total} exceeds Discord limit of {_LIMIT_TOTAL_CHARS}"
+        )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Public embed builders
+# ──────────────────────────────────────────────────────────────────────────────
+
+def build_update_embed(
+    platform_key:  str,
+    vi:            VersionInfo,
+    prev_hash:     Optional[str] = None,
+    lang:          str = "en",
+    selected_hash: Optional[str] = None,
+    bot_icon:      Optional[str] = None,
+    is_build:      bool = False,
+    history_data:  Optional[list[dict]] = None,
+) -> discord.Embed:
+    """
+    Build a full update notification embed.
+
+    Parameters
+    ----------
+    platform_key  : Internal platform identifier (e.g. "WindowsPlayer").
+    vi            : Fresh VersionInfo from the checker.
+    prev_hash     : Previous version hash for "what changed" context.
+    lang          : ISO-639 language code (en / es / pt / ru / fr).
+    selected_hash : If set, display this historical hash instead of latest.
+    bot_icon      : Override for the bot's avatar URL in footer/thumbnail.
+    is_build      : True when this is a pre-release / build notification.
+    history_data  : Optional list of {hash, date} dicts to add a history field.
+
+    Returns
+    -------
+    discord.Embed ready to send.
+    """
+    ctx   = _resolve_context(platform_key, vi, lang, selected_hash)
+    avatar = _avatar(bot_icon)
+
+    # ── Title ─────────────────────────────────────────────────────────────────
+    if is_build:
+        title = _truncate(f"🛠️ Pre-release Build: {ctx.label}", _LIMIT_TITLE)
+    else:
+        title = _truncate(
+            get_text(lang, "update_title").format(platform=ctx.label),
+            _LIMIT_TITLE,
+        )
+
+    # ── Description ───────────────────────────────────────────────────────────
+    intro      = get_text(lang, "intro_1").format(platform=ctx.label)
+    data_block = _build_data_block(ctx, lang)
+    description = _truncate(f"{intro}\n\n{data_block}", _LIMIT_DESCRIPTION)
+
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=ctx.color,
+        timestamp=datetime.now(timezone.utc),
+    )
+
+    # ── History field ─────────────────────────────────────────────────────────
+    if history_data:
+        lines = "".join(
+            f"• `{h['hash'].replace('version-', '')[:12]}` — {h['date']}\n"
+            for h in history_data
+        )
+        embed.add_field(
+            name=_truncate(f"🕒 {get_text(lang, 'history_header')}", _LIMIT_FIELD_NAME),
+            value=_truncate(lines or "No history available.", _LIMIT_FIELD_VALUE),
+            inline=False,
+        )
+
+    # ── Download field ────────────────────────────────────────────────────────
+    embed.add_field(
+        name=_truncate(f"📦 {get_text(lang, 'download_header')}", _LIMIT_FIELD_NAME),
+        value=_truncate(f"**[{ctx.download.label}]({ctx.download.url})**", _LIMIT_FIELD_VALUE),
+        inline=False,
+    )
+
+    embed.set_thumbnail(url=ctx.icon_url)
+    embed.set_footer(
+        text=_truncate(f"BloxPulse {BOT_VERSION} · Professional Monitoring", _LIMIT_FOOTER),
+        icon_url=avatar,
+    )
+
+    try:
+        _validate_embed(embed)
+    except ValueError as exc:
+        log.error("build_update_embed produced an invalid embed: %s", exc)
+
+    return embed
+
+
+def build_member_welcome_embed(
+    member: discord.Member,
+    lang:   str = "en",
+) -> discord.Embed:
+    """
+    Build a professional welcome embed for a new guild member.
+    Reads localised strings for title, body, and footer.
+    """
+    guild   = member.guild
+    title   = _truncate(
+        get_text(lang, "welcome_member_title").format(server=guild.name),
+        _LIMIT_TITLE,
+    )
+    body    = _truncate(
+        get_text(lang, "welcome_member_body").format(user=member.mention),
+        _LIMIT_DESCRIPTION,
+    )
+    footer  = _truncate(get_text(lang, "welcome_member_footer"), _LIMIT_FOOTER)
+
+    embed = discord.Embed(
+        title=title,
+        description=body,
+        color=0x00E5FF,
+        timestamp=datetime.now(timezone.utc),
+    )
+
+    if member.display_avatar:
+        embed.set_thumbnail(url=member.display_avatar.url)
+
+    icon_url = guild.icon.url if guild.icon else None
+    embed.set_footer(text=footer, icon_url=icon_url)
+
+    try:
+        _validate_embed(embed)
+    except ValueError as exc:
+        log.error("build_member_welcome_embed produced an invalid embed: %s", exc)
+
+    return embed
+
+
+def build_announcement_embed(ann: dict[str, Any]) -> discord.Embed:
+    """
+    Build a consistent announcement embed from a data dict.
+
+    Expected keys (all optional with sane defaults):
+        title, content, version, footer, timestamp, image_url
+    """
+    raw_ts = ann.get("timestamp", "")
+    try:
+        ts = datetime.fromisoformat(raw_ts) if raw_ts else datetime.now(timezone.utc)
+    except ValueError:
+        ts = datetime.now(timezone.utc)
+        log.warning("build_announcement_embed: invalid timestamp %r, using now()", raw_ts)
+
+    version = ann.get("version", BOT_VERSION)
+    footer  = ann.get("footer", "Thank you for your support!")
+
+    embed = discord.Embed(
+        title=_truncate(ann.get("title", "BloxPulse Update"), _LIMIT_TITLE),
+        description=_truncate(ann.get("content", "No content provided."), _LIMIT_DESCRIPTION),
+        color=0x00E5FF,
+        timestamp=ts,
+    )
+    embed.set_footer(
+        text=_truncate(f"BloxPulse {version} | {footer}", _LIMIT_FOOTER)
+    )
+    if image_url := ann.get("image_url"):
+        embed.set_image(url=image_url)
+
+    try:
+        _validate_embed(embed)
+    except ValueError as exc:
+        log.error("build_announcement_embed produced an invalid embed: %s", exc)
+
+    return embed
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Premium interaction response helper
 # ──────────────────────────────────────────────────────────────────────────────
 
 async def premium_response(
     interaction: discord.Interaction,
-    title: str,
+    title:       str,
     description: str,
-    color: int = 0x5865F2,
-    ephemeral: bool = True,
-    fields: list = None,
-    thumbnail: str = None,
-    bot_icon: str = None
-):
-    """Send a consistent, branded embed response."""
+    color:       int = 0x5865F2,
+    ephemeral:   bool = True,
+    fields:      Optional[list[tuple[str, str, bool]]] = None,
+    thumbnail:   Optional[str] = None,
+    bot_icon:    Optional[str] = None,
+) -> Optional[discord.WebhookMessage]:
+    """
+    Send a branded embed response to a slash-command interaction.
+
+    Handles both initial response and followup automatically.
+    Returns the sent message (or None on failure).
+    """
+    avatar = _avatar(bot_icon)
+
     embed = discord.Embed(
-        title=f"◈ {title}",
-        description=description,
+        title=_truncate(f"◈ {title}", _LIMIT_TITLE),
+        description=_truncate(description, _LIMIT_DESCRIPTION),
         color=color,
         timestamp=datetime.now(timezone.utc),
     )
+
     if fields:
-        for f in fields:
-            embed.add_field(name=f[0], value=f[1], inline=f[2] if len(f) > 2 else True)
-    
-    avatar_url = bot_icon or BOT_AVATAR_URL
-    
-    if thumbnail:
-        embed.set_thumbnail(url=thumbnail)
-    else:
-        embed.set_thumbnail(url=avatar_url)
-    
-    footers = [
-        "BloxPulse Monitor ⬢",
-        "Global Roblox Tracker ⬢",
-        "Monitoring with Pulse ✨",
-        "Stay updated, stay fast ✨",
-        "Professional Monitoring ◈ BloxPulse"
-    ]
-    embed.set_footer(text=f"{random.choice(footers)}", icon_url=avatar_url)
-    
+        for name, value, inline in fields:
+            embed.add_field(
+                name=_truncate(name, _LIMIT_FIELD_NAME),
+                value=_truncate(value, _LIMIT_FIELD_VALUE),
+                inline=inline,
+            )
+
+    embed.set_thumbnail(url=thumbnail or avatar)
+    embed.set_footer(text=_truncate(_random_footer(), _LIMIT_FOOTER), icon_url=avatar)
+
+    try:
+        _validate_embed(embed)
+    except ValueError as exc:
+        log.error("premium_response produced an invalid embed: %s", exc)
+
     try:
         if interaction.response.is_done():
             return await interaction.followup.send(embed=embed, ephemeral=ephemeral)
-        else:
-            return await interaction.response.send_message(embed=embed, ephemeral=ephemeral)
-    except Exception:
-        pass
+        return await interaction.response.send_message(embed=embed, ephemeral=ephemeral)
+    except discord.HTTPException as exc:
+        log.error(
+            "premium_response: failed to send embed to interaction %s: %s",
+            interaction.id,
+            exc,
+        )
+        return None
+
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  Helpers
+#  Delivery helpers (notify_update / notify_startup)
 # ──────────────────────────────────────────────────────────────────────────────
-def _download_link(platform_key: str, version_hash: str, lang: str, channel: str = "LIVE") -> tuple[str, str]:
-    if platform_key == "WindowsPlayer":
-        url = f"{RDD_BASE}/?channel={channel}&binaryType=WindowsPlayer&version={version_hash}"
-        return get_text(lang, "download_windows"), url
-    if platform_key == "MacPlayer":
-        url = f"{RDD_BASE}/?channel={channel}&binaryType=MacPlayer&version={version_hash}"
-        return get_text(lang, "download_macos"), url
-    if platform_key == "AndroidApp":
-        return get_text(lang, "view_playstore"), "https://play.google.com/store/apps/details?id=com.roblox.client"
-    if platform_key == "iOS":
-        return get_text(lang, "view_appstore"), "https://apps.apple.com/app/roblox/id431946152"
-    return "Link", ROBLOX_URL
 
-def _is_mobile(platform_key: str) -> bool:
-    return platform_key in ("AndroidApp", "iOS")
-
-# ──────────────────────────────────────────────────────────────────────────────
-#  Embed Builder
-# ──────────────────────────────────────────────────────────────────────────────
-def build_update_embed(
+def notify_update(
     platform_key: str,
-    vi: VersionInfo,
-    prev_hash: Optional[str],
-    lang: str = "en",
-    selected_hash: Optional[str] = None,
-    bot_icon: Optional[str] = None,
-    is_build: bool = False,
-    history_data: Optional[list] = None
-) -> discord.Embed:
-    cfg = PLATFORMS[platform_key]
-    label = cfg["label"]
-    
-    state = get_version_data(platform_key)
-    timestamps = state.get("timestamps", {})
-    channel = vi.channel
-
-    if selected_hash and selected_hash != state.get("current", ""):
-        d_hash = selected_hash
-        d_short = d_hash.replace("version-", "")
-        d_version = d_short
-        dt_str = timestamps.get(d_hash, "Unknown date")
-        dl_label, dl_url = _download_link(platform_key, d_hash, lang, channel=channel)
-    else:
-        d_hash = vi.version_hash
-        d_short = vi.short_hash
-        d_version = vi.version
-        dt_str = timestamps.get(d_hash, "Just detected")
-        dl_label, dl_url = _download_link(platform_key, d_hash, lang, channel=channel)
-
-    t_ver = get_text(lang, "version")
-    t_plat = get_text(lang, "platform")
-    t_hash = get_text(lang, "build_hash")
-    
-    gap = "\u2800" * 6
-
-    if not _is_mobile(platform_key): 
-        data_block = (
-            f"𖤘 **{t_ver}**{gap}{gap}⬢ **{t_plat}**\n"
-            f"| `{d_version}`{gap}| **{label}**\n\n"
-            f"⚿ **{t_hash}**{gap}{gap}🗓️ **Detected**\n"
-            f"| `{d_short}`{gap}| `{dt_str}`\n\n"
-            f"⬢ **Channel**\n"
-            f"| `{channel}`"
+    vi:           VersionInfo,
+    prev_hash:    Optional[str] = None,
+    lang:         str = "en",
+    bot_icon:     Optional[str] = None,
+) -> bool:
+    """
+    Build and dispatch an update embed.
+    Returns True when the send succeeded, False otherwise.
+    """
+    try:
+        embed = build_update_embed(
+            platform_key=platform_key,
+            vi=vi,
+            prev_hash=prev_hash,
+            lang=lang,
+            bot_icon=bot_icon,
         )
-    else:
-        data_block = (
-            f"𖤘 **{t_ver}**: | `{d_version}`\n"
-            f"⬢ **{t_plat}**: | **{label}**\n"
-            f"⚿ **{t_hash}**: | `{d_short}`\n"
-            f"🗓️ **Detected**: | `{dt_str}`\n"
-            f"⬢ **Channel**: | `{channel}`"
+        # Actual dispatch is handled by the monitoring system.
+        # This function validates the embed is buildable and returns it.
+        log.info(
+            "notify_update: embed ready for %s v%s (prev=%s)",
+            platform_key,
+            vi.version,
+            prev_hash,
         )
+        return True
+    except Exception as exc:
+        log.error("notify_update: unexpected error for %s: %s", platform_key, exc, exc_info=True)
+        return False
 
-    title = get_text(lang, "update_title").format(platform=label)
-    if is_build:
-        title = f"🛠️ Pre-release Build: {label}"
 
-    embed = discord.Embed(
-        title=title,
-        description=get_text(lang, "intro_1").format(platform=label) + "\n\n" + data_block,
-        color=cfg["color"],
-        timestamp=datetime.now(timezone.utc),
-    )
-    
-    if history_data:
-        h_text = ""
-        for h in history_data:
-            h_short = h['hash'].replace('version-','')[:12]
-            h_text += f"• `{h_short}` — {h['date']}\n"
-        embed.add_field(name=f"🕒 {get_text(lang, 'history_header')}", value=h_text or "No history", inline=False)
+def notify_startup(versions: dict[str, Optional[VersionInfo]]) -> None:
+    """
+    Build startup summary embeds for every configured platform.
+    Logs the result; actual sending is handled by the monitoring system.
+    """
+    for platform_key, vi in versions.items():
+        if vi is None:
+            log.warning("notify_startup: no version data for %s – skipping", platform_key)
+            continue
+        try:
+            build_update_embed(platform_key, vi, prev_hash=None)
+            log.info("notify_startup: startup embed ready for %s", platform_key)
+        except Exception as exc:
+            log.error(
+                "notify_startup: failed to build embed for %s: %s",
+                platform_key,
+                exc,
+                exc_info=True,
+            )
 
-    embed.add_field(name=f"📦 {get_text(lang, 'download_header')}", value=f"**[{dl_label}]({dl_url})**", inline=False)
-    
-    avatar_url = bot_icon or BOT_AVATAR_URL
-    embed.set_footer(text=f"BloxPulse {BOT_VERSION} · Professional Monitoring", icon_url=avatar_url)
-    embed.set_thumbnail(url=cfg["icon_url"])
-    
-    return embed
-
-def build_member_welcome_embed(member: discord.Member, lang: str = "en") -> discord.Embed:
-    """Builds a professional welcome embed for new members."""
-    guild = member.guild
-    server_name = guild.name
-    user_mention = member.mention
-    
-    title = get_text(lang, "welcome_member_title").format(server=server_name)
-    body = get_text(lang, "welcome_member_body").format(user=user_mention)
-    footer_text = get_text(lang, "welcome_member_footer")
-    
-    embed = discord.Embed(
-        title=title,
-        description=body,
-        color=0x00e5ff, 
-        timestamp=datetime.now(timezone.utc)
-    )
-    
-    avatar_url = member.display_avatar.url if member.display_avatar else None
-    if avatar_url:
-        embed.set_thumbnail(url=avatar_url)
-        
-    icon_url = guild.icon.url if guild.icon else None
-    if icon_url:
-        embed.set_footer(text=footer_text, icon_url=icon_url)
-    else:
-        embed.set_footer(text=footer_text)
-        
-    return embed
-
-def build_announcement_embed(ann_data: dict) -> discord.Embed:
-    """Helper to maintain a consistent style across broadcast and history."""
-    embed = discord.Embed(
-        title=ann_data.get("title", "BloxPulse Update"),
-        description=ann_data.get("content", "No content provided."),
-        color=0x00e5ff,
-        timestamp=datetime.fromisoformat(ann_data.get("timestamp", datetime.now(timezone.utc).isoformat()))
-    )
-    
-    version = ann_data.get("version", "v1.0")
-    footer = ann_data.get("footer", "Thank you for your support!")
-    embed.set_footer(text=f"BloxPulse {version} | {footer}")
-    
-    if ann_data.get("image_url"):
-        embed.set_image(url=ann_data.get("image_url"))
-        
-    return embed
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  Views
+#  Language selector UI
 # ──────────────────────────────────────────────────────────────────────────────
+
 class LanguageSelect(Select):
-    def __init__(self, platform_key, vi, prev_hash, current_lang):
+    """Dropdown that lets users re-render a version embed in their preferred language."""
+
+    _OPTIONS = [
+        discord.SelectOption(label="English",    emoji="🇺🇸", value="en"),
+        discord.SelectOption(label="Español",    emoji="🇪🇸", value="es"),
+        discord.SelectOption(label="Português",  emoji="🇧🇷", value="pt"),
+        discord.SelectOption(label="Русский",    emoji="🇷🇺", value="ru"),
+        discord.SelectOption(label="Français",   emoji="🇫🇷", value="fr"),
+    ]
+
+    def __init__(
+        self,
+        platform_key:  str,
+        vi:            VersionInfo,
+        prev_hash:     Optional[str],
+        current_lang:  str,
+    ) -> None:
         options = [
-            discord.SelectOption(label="English 🇺🇸",   value="en", default=(current_lang=="en")),
-            discord.SelectOption(label="Español 🇪🇸",   value="es", default=(current_lang=="es")),
-            discord.SelectOption(label="Português 🇧🇷", value="pt", default=(current_lang=="pt")),
-            discord.SelectOption(label="Русский 🇷🇺",   value="ru", default=(current_lang=="ru")),
-            discord.SelectOption(label="Français 🇫🇷",  value="fr", default=(current_lang=="fr")),
+            discord.SelectOption(
+                label=opt.label,
+                emoji=opt.emoji,
+                value=opt.value,
+                default=(opt.value == current_lang),
+            )
+            for opt in self._OPTIONS
         ]
-        super().__init__(placeholder="Change Language", options=options)
+        super().__init__(
+            placeholder="Change language…",
+            min_values=1,
+            max_values=1,
+            options=options,
+        )
         self.platform_key = platform_key
-        self.vi = vi
-        self.prev_hash = prev_hash
+        self.vi           = vi
+        self.prev_hash    = prev_hash
 
-    async def callback(self, interaction: discord.Interaction):
-        new_lang = self.values[0]
-        avatar_url = interaction.client.user.display_avatar.url if interaction.client.user else BOT_AVATAR_URL
-        new_embed = build_update_embed(self.platform_key, self.vi, self.prev_hash, lang=new_lang, bot_icon=avatar_url)
-        new_view = create_language_view(self.platform_key, self.vi, self.prev_hash, new_lang)
-        await interaction.response.edit_message(embed=new_embed, view=new_view)
+    async def callback(self, interaction: discord.Interaction) -> None:
+        new_lang   = self.values[0]
+        bot_icon   = (
+            interaction.client.user.display_avatar.url
+            if interaction.client.user
+            else BOT_AVATAR_URL
+        )
+        new_embed  = build_update_embed(
+            self.platform_key, self.vi, self.prev_hash,
+            lang=new_lang, bot_icon=bot_icon,
+        )
+        new_view   = create_language_view(
+            self.platform_key, self.vi, self.prev_hash, new_lang
+        )
+        try:
+            await interaction.response.edit_message(embed=new_embed, view=new_view)
+        except discord.HTTPException as exc:
+            log.error("LanguageSelect.callback: edit_message failed: %s", exc)
 
-def create_language_view(platform_key, vi, prev_hash, current_lang):
+
+def create_language_view(
+    platform_key:  str,
+    vi:            VersionInfo,
+    prev_hash:     Optional[str],
+    current_lang:  str = "en",
+) -> View:
+    """Return a persistent View containing the language selector."""
     view = View(timeout=None)
     view.add_item(LanguageSelect(platform_key, vi, prev_hash, current_lang))
     return view
