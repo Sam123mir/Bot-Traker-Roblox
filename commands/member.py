@@ -143,6 +143,39 @@ class UpdatesHistoryView(discord.ui.View):
         super().__init__(timeout=None)
         self.add_item(UpdatesHistorySelect(history))
 
+class RulesLanguageSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(label="English", value="en", emoji="🇺🇸"),
+            discord.SelectOption(label="Español", value="es", emoji="🇪🇸"),
+            discord.SelectOption(label="Português", value="pt", emoji="🇧🇷"),
+            discord.SelectOption(label="Русский", value="ru", emoji="🇷🇺"),
+            discord.SelectOption(label="Français", value="fr", emoji="🇫🇷"),
+        ]
+        super().__init__(placeholder="🌍 Select a Language / Selecciona un Idioma...", options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        lang = self.values[0]
+        title = get_text(lang, "rules_title")
+        body = get_text(lang, "rules_body")
+        
+        embed = discord.Embed(
+            title=title,
+            description=body,
+            color=0x2ECC71,
+            timestamp=datetime.now(timezone.utc)
+        )
+        avatar_url = interaction.client.user.display_avatar.url if interaction.client.user else BOT_AVATAR_URL
+        embed.set_footer(text=f"{interaction.guild.name} • Rules ({lang.upper()})", icon_url=avatar_url)
+        embed.set_thumbnail(url=interaction.guild.icon.url if interaction.guild.icon else avatar_url)
+        
+        await interaction.response.edit_message(embed=embed, view=self.view)
+
+class RulesLanguageView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(RulesLanguageSelect())
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 #  Member Commands Cog
@@ -501,7 +534,8 @@ class MemberCommands(commands.Cog):
     @app_commands.describe(channel="Optional: Publish the rules to this channel (requires Manage Guild permissions).")
     async def rules_cmd(self, interaction: discord.Interaction, channel: Optional[discord.TextChannel] = None):
         """Displays server rules. If channel is provided, posts publicly (Admins only)."""
-        lang = get_guild_config(interaction.guild_id).get("language", "en")
+        # Default to English as per user request
+        lang = "en"
         
         # Check permissions if trying to publish publicly
         if channel and not interaction.permissions.manage_guild:
@@ -510,33 +544,20 @@ class MemberCommands(commands.Cog):
                 ephemeral=True
             )
             
+        title = get_text(lang, "rules_title")
+        body = get_text(lang, "rules_body")
+            
         embed = discord.Embed(
-            title="📜 Comunidad & Reglas / Community Rules",
-            description=(
-                "**1. Respeto Mutuo / Mutual Respect**\n"
-                "↳ Trata a todos con respeto. Cero tolerancia al acoso o toxicidad.\n"
-                "↳ Treat everyone with respect. Zero tolerance for harassment.\n\n"
-                "**2. No Spam**\n"
-                "↳ No envíes mensajes repetitivos, enlaces maliciosos ni promociones sin permiso.\n"
-                "↳ Do not send repetitive messages, malicious links, or self-promote without permission.\n\n"
-                "**3. Canales Correctos / Correct Channels**\n"
-                "↳ Usa los canales para su propósito específico.\n"
-                "↳ Use channels for their intended purposes.\n\n"
-                "**4. Contenido Seguro / Safe Content**\n"
-                "↳ No contenido NSFW, ilegal, o perjudicial.\n"
-                "↳ No NSFW, illegal, or harmful content.\n\n"
-                "**5. Privacidad / Privacy**\n"
-                "↳ No compartas información personal de otros.\n"
-                "↳ Do not share personal information of others.\n\n"
-                "*Cualquier infracción será moderada por el equipo administrativo.*\n"
-                "*Any violation will be moderated by the administrative team.*"
-            ),
+            title=title,
+            description=body,
             color=0x2ECC71,
             timestamp=datetime.now(timezone.utc)
         )
         avatar_url = self.bot.user.display_avatar.url if self.bot.user else BOT_AVATAR_URL
-        embed.set_footer(text=f"{interaction.guild.name} • Rules", icon_url=avatar_url)
+        embed.set_footer(text=f"{interaction.guild.name} • Rules ({lang.upper()})", icon_url=avatar_url)
         embed.set_thumbnail(url=interaction.guild.icon.url if interaction.guild.icon else avatar_url)
+
+        view = RulesLanguageView() if not channel else None
 
         if channel:
             await interaction.response.defer(ephemeral=True)
@@ -546,7 +567,7 @@ class MemberCommands(commands.Cog):
             except discord.Forbidden:
                 await interaction.followup.send(f"❌ I don't have permission to send messages in {channel.mention}.", ephemeral=True)
         else:
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(MemberCommands(bot))

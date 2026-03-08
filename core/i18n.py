@@ -44,6 +44,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "goodbye_member_title": "✨ ¡Adiós, {user}!",
         "goodbye_member_body": "⬢ **{user}** ha dejado nuestra comunidad. ⬢\n\n¡Te deseamos lo mejor! Ahora somos `{count}` miembros.",
         "goodbye_member_footer": "BloxPulse | Monitoreo Profesional",
+        "rules_title": "📜 Reglas de la Comunidad",
+        "rules_body": "**1. Respeto Mutuo**\n↳ Trata a todos con respeto. Cero tolerancia al acoso o toxicidad.\n\n**2. No Spam**\n↳ No envíes mensajes repetitivos, enlaces maliciosos ni promociones sin permiso.\n\n**3. Canales Correctos**\n↳ Usa los canales para su propósito específico.\n\n**4. Contenido Seguro**\n↳ Nada de contenido NSFW, ilegal, o perjudicial.\n\n**5. Privacidad**\n↳ No compartas información personal de otros.\n\n*Cualquier infracción será moderada por el equipo administrativo.*",
     },
     "en": {
         "update_title": "✨ Roblox {platform} Updated!",
@@ -80,6 +82,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "goodbye_member_title": "✨ Farewell, {user}!",
         "goodbye_member_body": "⬢ **{user}** has left our community. ⬢\n\nWe wish you the best! We now have `{count}` members.",
         "goodbye_member_footer": "BloxPulse | Professional Monitoring",
+        "rules_title": "📜 Community Rules",
+        "rules_body": "**1. Mutual Respect**\n↳ Treat everyone with respect. Zero tolerance for harassment or toxicity.\n\n**2. No Spam**\n↳ Do not send repetitive messages, malicious links, or self-promote without permission.\n\n**3. Correct Channels**\n↳ Use channels for their intended purposes.\n\n**4. Safe Content**\n↳ No NSFW, illegal, or harmful content.\n\n**5. Privacy**\n↳ Do not share personal information of others.\n\n*Any violation will be moderated by the administrative team.*",
     },
     "pt": {
         "update_title": "✨ Roblox {platform} Atualizado!",
@@ -103,6 +107,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "goodbye_member_title": "✨ Adeus, {user}!",
         "goodbye_member_body": "⬢ **{user}** deixou nossa comunidade. ⬢\n\nDesejamos o melhor! Agora temos `{count}` membros.",
         "goodbye_member_footer": "BloxPulse | Monitoramento Profissional",
+        "rules_title": "📜 Regras da Comunidade",
+        "rules_body": "**1. Respeito Mútuo**\n↳ Trate todos com respeito. Tolerância zero para assédio ou toxicidade.\n\n**2. Sem Spam**\n↳ Não envie mensagens repetitivas, links maliciosos ou promoções sem permissão.\n\n**3. Canais Corretos**\n↳ Use os canais para seus propósitos específicos.\n\n**4. Conteúdo Seguro**\n↳ Sem conteúdo NSFW, ilegal ou prejudicial.\n\n**5. Privacidade**\n↳ Não compartilhe informações pessoais de terceiros.\n\n*Qualquer violação será moderada pela equipe administrativa.*",
     },
     "ru": {
         "update_title": "✨ Roblox {platform} обновлен!",
@@ -126,6 +132,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "goodbye_member_title": "✨ Прощай, {user}!",
         "goodbye_member_body": "⬢ **{user}** покинул наше сообщество. ⬢\n\nЖелаем всего наилучшего! Теперь нас `{count}` участников.",
         "goodbye_member_footer": "BloxPulse | Профессиональный мониторинг",
+        "rules_title": "📜 Правила сообщества",
+        "rules_body": "**1. Взаимоуважение**\n↳ Относитесь ко всем с уважением. Нулевая терпимость к токсичности.\n\n**2. Нет спаму**\n↳ Не отправляйте повторяющиеся сообщения, вредоносные ссылки или саморекламу.\n\n**3. Правильные каналы**\n↳ Используйте каналы по их прямому назначению.\n\n**4. Безопасный контент**\n↳ Никакого NSFW, нелегального или опасного контента.\n\n**5. Конфиденциальность**\n↳ Не делитесь личной информацией других.\n\n*Любое нарушение будет модерироваться командой.*",
     },
     "fr": {
         "update_title": "✨ Roblox {platform} Mis à jour !",
@@ -149,6 +157,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "goodbye_member_title": "✨ Adieu, {user} !",
         "goodbye_member_body": "⬢ **{user}** a quitté notre communauté. ⬢\n\nNous vous souhaitons le meilleur ! Nous comptons désormais `{count}` membres.",
         "goodbye_member_footer": "BloxPulse | Surveillance Professionnelle",
+        "rules_title": "📜 Règles de la Communauté",
+        "rules_body": "**1. Respect Mutuel**\n↳ Traitez tout le monde avec respect. Tolérance zéro pour le harcèlement.\n\n**2. Pas de Spam**\n↳ N'envoyez pas de messages répétitifs, de liens malveillants, ni de pubs.\n\n**3. Bons Salons**\n↳ Utilisez les salons pour leur but précis.\n\n**4. Contenu Sûr**\n↳ Pas de contenu NSFW, illégal ou nuisible.\n\n**5. Confidentialité**\n↳ Ne partagez pas les infos personnelles des autres.\n\n*Toute violation sera modérée par l'équipe.*",
     }
 }
 
