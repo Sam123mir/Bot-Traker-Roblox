@@ -11,7 +11,7 @@ so a crash mid-write never corrupts the live file.
 Public surface
 --------------
 Version state
-    get_version_data(platform_key)             → VersionState
+    get_version_data(platform_key, channel)    → VersionState
     update_version(platform_key, ...)          → bool
     backfill_history(platform_key, entries)    → int   (new entries added)
 
@@ -49,6 +49,7 @@ class VersionState(TypedDict, total=False):
     last_build:  str
     history:     list[str]
     timestamps:  dict[str, str]
+    fflag_count: int
 
 
 class GuildConfig(TypedDict, total=False):
@@ -57,10 +58,22 @@ class GuildConfig(TypedDict, total=False):
     language:                str
     announcement_channel_id: Optional[int]
     welcome_channel_id:      Optional[int]
+    goodbye_channel_id:      Optional[int]
     welcome_dm_enabled:      bool
     goodbye_enabled:         bool
     auto_role_ids:           list[int]
     welcome_color:           int
+    member_count_channel_id: Optional[int]
+    rules_channel_id:        Optional[int]
+    roles_channel_id:        Optional[int]
+    intro_channel_id:        Optional[int]
+    bug_reports_channel_id:  Optional[int]
+    suggestions_channel_id:  Optional[int]
+    api_status_win_id:       Optional[int]
+    api_status_mac_id:       Optional[int]
+    api_status_android_id:   Optional[int]
+    api_status_ios_id:       Optional[int]
+    bot_version_channel_id:  Optional[int]
 
 
 _DEFAULT_GUILD_CONFIG: GuildConfig = {
@@ -69,10 +82,22 @@ _DEFAULT_GUILD_CONFIG: GuildConfig = {
     "language":                "en",
     "announcement_channel_id": None,
     "welcome_channel_id":      None,
+    "goodbye_channel_id":      None,
     "welcome_dm_enabled":      False,
     "goodbye_enabled":         False,
     "auto_role_ids":           [],
     "welcome_color":           0x00E5FF,
+    "member_count_channel_id": None,
+    "rules_channel_id":        None,
+    "roles_channel_id":        None,
+    "intro_channel_id":        None,
+    "bug_reports_channel_id":  None,
+    "suggestions_channel_id":  None,
+    "api_status_win_id":       None,
+    "api_status_mac_id":       None,
+    "api_status_android_id":   None,
+    "api_status_ios_id":       None,
+    "bot_version_channel_id":  None,
 }
 
 _EMPTY_VERSION_STATE: VersionState = {
@@ -81,6 +106,7 @@ _EMPTY_VERSION_STATE: VersionState = {
     "last_build":  "",
     "history":     [],
     "timestamps":  {},
+    "fflag_count": 0,
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -191,13 +217,18 @@ def _migrate_version_state(raw: Any) -> VersionState:
 #  Version state
 # ──────────────────────────────────────────────────────────────────────────────
 
-def get_version_data(platform_key: str) -> VersionState:
+def get_version_data(platform_key: str, channel: str = "LIVE") -> VersionState:
     """
-    Return the full version state for *platform_key*.
-    Always returns a fully-shaped VersionState dict (never raises).
+    Return the full version state for *platform_key* on a specific *channel*.
+    Unique storage key: "platform:channel".
     """
+    key = f"{platform_key}:{channel}" if channel != "LIVE" else platform_key
     with _lock_for(VERSIONS_FILE):
-        raw = _load_json(VERSIONS_FILE).get(platform_key)
+        raw = _load_json(VERSIONS_FILE).get(key)
+        # Fallback to legacy key if no channel-specific key exists for LIVE
+        if raw is None and channel == "LIVE":
+            raw = _load_json(VERSIONS_FILE).get(platform_key)
+            
     return _migrate_version_state(raw)
 
 
@@ -206,6 +237,8 @@ def update_version(
     new_hash:     str,
     is_official:  bool = True,
     timestamp:    Optional[str] = None,
+    channel:      str = "LIVE",
+    fflag_count:  int = 0,
 ) -> bool:
     """
     Persist a new version hash for *platform_key*.
@@ -223,10 +256,11 @@ def update_version(
     True on a successful write.
     """
     final_ts = timestamp or _now_str()
+    key      = f"{platform_key}:{channel}" if channel != "LIVE" else platform_key
 
     with _lock_for(VERSIONS_FILE):
         full_data = _load_json(VERSIONS_FILE)
-        state     = _migrate_version_state(full_data.get(platform_key))
+        state     = _migrate_version_state(full_data.get(key))
 
         history:    list[str]      = state["history"]
         timestamps: dict[str, str] = state["timestamps"]
@@ -242,12 +276,13 @@ def update_version(
         if is_official:
             state["current"]     = new_hash
             state["last_update"] = new_hash
+            state["fflag_count"] = fflag_count
         else:
             state["last_build"] = new_hash
 
         state["history"]    = history
         state["timestamps"] = timestamps
-        full_data[platform_key] = state
+        full_data[key]      = state
 
         ok = _save_json(VERSIONS_FILE, full_data)
 
@@ -284,8 +319,6 @@ def backfill_history(platform_key: str, entries: list) -> int:
     except (TypeError, KeyError) as exc:
         log.error("backfill_history: cannot sort entries for %s: %s", platform_key, exc)
         return 0
-
-    added = 0
 
     with _lock_for(VERSIONS_FILE):
         full_data = _load_json(VERSIONS_FILE)

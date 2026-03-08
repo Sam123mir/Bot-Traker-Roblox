@@ -196,10 +196,10 @@ def _build_dm_embed(member: discord.Member, cfg: dict) -> discord.Embed:
     return embed
 
 
-async def _find_welcome_channel(guild: discord.Guild, cfg: dict) -> discord.TextChannel | None:
-    """Resolve the best channel to send the welcome message."""
-    # 1. Explicitly configured welcome channel
-    if wid := cfg.get("welcome_channel_id"):
+async def _find_welcome_channel(guild: discord.Guild, cfg: dict, key: str = "welcome_channel_id") -> discord.TextChannel | None:
+    """Resolve the best channel to send the welcome/goodbye message."""
+    # 1. Explicitly configured channel for this specific purpose
+    if wid := cfg.get(key):
         if ch := guild.get_channel(wid):
             return ch
 
@@ -237,9 +237,40 @@ class WelcomeSystem(commands.Cog):
 
     # ── Internal helpers ──────────────────────────────────────────────────────
 
+    async def _update_member_count_channel(self, guild: discord.Guild):
+        """Find and rename the voice channel for tracking member counts."""
+        cfg = get_guild_config(guild.id)
+        channel_id = cfg.get("member_count_channel_id")
+        if not channel_id:
+            return
+
+        channel = guild.get_channel(channel_id)
+        if not isinstance(channel, discord.VoiceChannel):
+            return
+
+        # Permissions check
+        if not channel.permissions_for(guild.me).manage_channels:
+            logger.warning(f"BloxPulse: Missing Manage Channels perm to update count in {guild.name}")
+            return
+
+        count = guild.member_count
+        new_name = f"》 Members: {count}"
+        
+        if channel.name != new_name:
+            try:
+                await channel.edit(name=new_name)
+                logger.debug(f"BloxPulse: Updated member count channel in {guild.name} to {count}")
+            except discord.RateLimited:
+                pass # Silent ignore, will catch up next time
+            except Exception as e:
+                logger.error(f"BloxPulse: Failed to update count channel in {guild.name}: {e}")
+
     async def _trigger_status_update(self, guild: discord.Guild):
+        # Update dynamic status if available
         if hasattr(self.bot, "update_dynamic_status"):
             await self.bot.update_dynamic_status(guild)
+        # Also update the voice channel name
+        await self._update_member_count_channel(guild)
 
     async def _assign_auto_roles(self, member: discord.Member, cfg: dict):
         """Assign configured auto-roles to the new member."""
@@ -324,7 +355,7 @@ class WelcomeSystem(commands.Cog):
         if not cfg.get("goodbye_enabled", False):
             return
 
-        target_channel = await _find_welcome_channel(member.guild, cfg)
+        target_channel = await _find_welcome_channel(member.guild, cfg, key="goodbye_channel_id")
         if not target_channel:
             return
 
@@ -450,7 +481,7 @@ class WelcomeConfigCog(commands.Cog):
     ):
         cfg = get_guild_config(interaction.guild.id)
         cfg["welcome_channel_id"] = channel.id
-        set_guild_config(interaction.guild.id, cfg)
+        set_guild_config(interaction.guild.id, "welcome_channel_id", channel.id)
         await interaction.response.send_message(
             f"✅ Welcome messages will now be sent to {channel.mention}.",
             ephemeral=True,
@@ -476,7 +507,7 @@ class WelcomeConfigCog(commands.Cog):
             return
         cfg = get_guild_config(interaction.guild.id)
         cfg["welcome_color"] = color
-        set_guild_config(interaction.guild.id, cfg)
+        set_guild_config(interaction.guild.id, "welcome_color", color)
         await interaction.response.send_message(
             f"✅ Welcome color updated to `#{hex_color.strip('#').upper()}`.",
             ephemeral=True,
@@ -495,7 +526,7 @@ class WelcomeConfigCog(commands.Cog):
     ):
         cfg = get_guild_config(interaction.guild.id)
         cfg["welcome_dm_enabled"] = enabled
-        set_guild_config(interaction.guild.id, cfg)
+        set_guild_config(interaction.guild.id, "welcome_dm_enabled", enabled)
         state = "enabled ✅" if enabled else "disabled ❌"
         await interaction.response.send_message(
             f"Welcome DMs are now **{state}**.", ephemeral=True
@@ -521,9 +552,28 @@ class WelcomeConfigCog(commands.Cog):
             return
         ids.append(role.id)
         cfg["auto_role_ids"] = ids
-        set_guild_config(interaction.guild.id, cfg)
+        set_guild_config(interaction.guild.id, "auto_role_ids", ids)
         await interaction.response.send_message(
             f"✅ {role.mention} will now be assigned to new members.", ephemeral=True
+        )
+
+    # /welcome-config goodbye-channel
+    @app_commands.command(
+        name="welcome-goodbye-channel",
+        description="Set the channel where goodbye messages will be sent.",
+    )
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def set_goodbye_channel(
+        self,
+        interaction: discord.Interaction,
+        channel: discord.TextChannel,
+    ):
+        cfg = get_guild_config(interaction.guild.id)
+        cfg["goodbye_channel_id"] = channel.id
+        set_guild_config(interaction.guild.id, "goodbye_channel_id", channel.id)
+        await interaction.response.send_message(
+            f"✅ Goodbye messages will now be sent to {channel.mention}.",
+            ephemeral=True,
         )
 
     # /welcome-config goodbye-toggle
@@ -539,7 +589,7 @@ class WelcomeConfigCog(commands.Cog):
     ):
         cfg = get_guild_config(interaction.guild.id)
         cfg["goodbye_enabled"] = enabled
-        set_guild_config(interaction.guild.id, cfg)
+        set_guild_config(interaction.guild.id, "goodbye_enabled", enabled)
         state = "enabled ✅" if enabled else "disabled ❌"
         await interaction.response.send_message(
             f"Goodbye messages are now **{state}**.", ephemeral=True

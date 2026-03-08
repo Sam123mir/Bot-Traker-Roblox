@@ -68,6 +68,7 @@ _LIMIT_TOTAL_CHARS = 6000
 class _DownloadLink:
     label: str
     url:   str
+    direct_url: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -113,15 +114,39 @@ def _resolve_download_link(
     channel: str = "LIVE",
 ) -> _DownloadLink:
     """Return a labelled download / store URL for the given platform."""
+    
+    # Base CDN URL handling channels
+    base_cdn = "https://setup.rbxcdn.com"
+    if channel != "LIVE":
+        base_cdn += f"/channel/{channel.lower()}"
+
     if platform_key == "WindowsPlayer":
+        direct = f"{base_cdn}/{version_hash}-RobloxPlayerLauncher.exe"
         return _DownloadLink(
             label=get_text(lang, "download_windows"),
-            url=f"{RDD_BASE}/?channel={channel}&binaryType=WindowsPlayer&version={version_hash}",
+            url=f"{RDD_BASE}/download?channel={channel}&binaryType=WindowsPlayer&version={version_hash}",
+            direct_url=direct
         )
     if platform_key == "MacPlayer":
+        direct = f"{base_cdn}/mac/{version_hash}-RobloxPlayer.zip"
         return _DownloadLink(
             label=get_text(lang, "download_macos"),
-            url=f"{RDD_BASE}/?channel={channel}&binaryType=MacPlayer&version={version_hash}",
+            url=f"{RDD_BASE}/download?channel={channel}&binaryType=MacPlayer&version={version_hash}",
+            direct_url=direct
+        )
+    if platform_key == "WindowsStudio":
+        direct = f"{base_cdn}/{version_hash}-RobloxStudioLauncherBeta.exe"
+        return _DownloadLink(
+            label="Download Windows Studio",
+            url=direct,
+            direct_url=direct
+        )
+    if platform_key == "MacStudio":
+        direct = f"{base_cdn}/mac/{version_hash}-RobloxStudio.zip"
+        return _DownloadLink(
+            label="Download macOS Studio",
+            url=direct,
+            direct_url=direct
         )
     if platform_key == "AndroidApp":
         return _DownloadLink(
@@ -180,30 +205,28 @@ def _resolve_context(
     )
 
 
-def _build_data_block(ctx: _EmbedContext, lang: str) -> str:
-    """Compose the description data block adapted to mobile/desktop layout."""
+def _build_data_block(ctx: _EmbedContext, lang: str, fflag_count: int = 0) -> str:
+    """Compose the description data block matching the user's screenshot."""
     t_ver  = get_text(lang, "version")
     t_plat = get_text(lang, "platform")
     t_hash = get_text(lang, "build_hash")
-    gap    = "\u2800" * 6  # Braille blank spacer
+    gap    = "\u2800" * 8  # Spacing
+    
+    # Matching screenshot: 📕 Version, 📡 Platform, 🔑 Build Hash
+    # Layout with vertical bars exactly as shown
+    lines = [
+        f"📕 **{t_ver}**{gap}{gap}📡 **{t_plat}**",
+        f"|  `{ctx.version}`{gap}| **{ctx.label}**",
+        "",
+        f"🔑 **{t_hash}**",
+        f"|  `{ctx.full_hash}`"
+    ]
+    
+    if fflag_count > 0:
+        lines.append(f"\n🛠️ **FFlags**")
+        lines.append(f"|  `{fflag_count}` configurados")
 
-    if ctx.is_mobile:
-        return (
-            f"𖤘 **{t_ver}**: | `{ctx.version}`\n"
-            f"⬢ **{t_plat}**: | **{ctx.label}**\n"
-            f"⚿ **{t_hash}**: | `{ctx.short_hash}`\n"
-            f"🗓️ **Detected**: | `{ctx.detected_at}`\n"
-            f"⬢ **Channel**: | `{ctx.channel}`"
-        )
-
-    return (
-        f"𖤘 **{t_ver}**{gap}{gap}⬢ **{t_plat}**\n"
-        f"| `{ctx.version}`{gap}| **{ctx.label}**\n\n"
-        f"⚿ **{t_hash}**{gap}{gap}🗓️ **Detected**\n"
-        f"| `{ctx.short_hash}`{gap}| `{ctx.detected_at}`\n\n"
-        f"⬢ **Channel**\n"
-        f"| `{ctx.channel}`"
-    )
+    return "\n".join(lines)
 
 
 def _validate_embed(embed: discord.Embed) -> None:
@@ -250,6 +273,7 @@ def build_update_embed(
     bot_icon:      Optional[str] = None,
     is_build:      bool = False,
     history_data:  Optional[list[dict]] = None,
+    channel:      str = "LIVE",
 ) -> discord.Embed:
     """
     Build a full update notification embed.
@@ -264,6 +288,7 @@ def build_update_embed(
     bot_icon      : Override for the bot's avatar URL in footer/thumbnail.
     is_build      : True when this is a pre-release / build notification.
     history_data  : Optional list of {hash, date} dicts to add a history field.
+    channel       : The channel the version belongs to (e.g., "LIVE", "ZNext").
 
     Returns
     -------
@@ -273,48 +298,55 @@ def build_update_embed(
     avatar = _avatar(bot_icon)
 
     # ── Title ─────────────────────────────────────────────────────────────────
-    if is_build:
-        title = _truncate(f"🛠️ Pre-release Build: {ctx.label}", _LIMIT_TITLE)
-    else:
-        title = _truncate(
-            get_text(lang, "update_title").format(platform=ctx.label),
-            _LIMIT_TITLE,
-        )
-
-    # ── Description ───────────────────────────────────────────────────────────
-    intro      = get_text(lang, "intro_1").format(platform=ctx.label)
-    data_block = _build_data_block(ctx, lang)
-    description = _truncate(f"{intro}\n\n{data_block}", _LIMIT_DESCRIPTION)
-
+    # Screenshot header: "Roblox {platform} Updated!"
+    title = f"Roblox {ctx.label} Updated!"
+    if channel != "LIVE":
+        title += f" [{channel}]"
+    
     embed = discord.Embed(
-        title=title,
-        description=description,
+        title=_truncate(title, _LIMIT_TITLE),
         color=ctx.color,
         timestamp=datetime.now(timezone.utc),
     )
 
+    # ── Description ───────────────────────────────────────────────────────────
+    # Screenshot intro text (italicized)
+    intro = f"*Roblox has deployed a new build for **{ctx.label}**.*\n*This version is now operational on production servers.*"
+    data_block = _build_data_block(ctx, lang, vi.fflag_count)
+    
+    embed.description = f"{intro}\n\n{data_block}"
+
     # ── History field ─────────────────────────────────────────────────────────
     if history_data:
         lines = "".join(
-            f"• `{h['hash'].replace('version-', '')[:12]}` — {h['date']}\n"
+            f"• `{h['hash']}` — {h['date']} UTC\n"
             for h in history_data
         )
         embed.add_field(
-            name=_truncate(f"🕒 {get_text(lang, 'history_header')}", _LIMIT_FIELD_NAME),
+            name=_truncate(f"📜 {get_text(lang, 'history_header')}", _LIMIT_FIELD_NAME),
             value=_truncate(lines or "No history available.", _LIMIT_FIELD_VALUE),
             inline=False,
         )
 
     # ── Download field ────────────────────────────────────────────────────────
+    # Screenshot: "Direct Download" in bold/italic then link
+    download_header = "***Direct Download***"
+    if ctx.is_mobile:
+        download_val = f"{download_header}\n[{ctx.download.label}]({ctx.download.url})"
+    else:
+        # Use direct URL if available, otherwise fallback
+        url = ctx.download.direct_url or ctx.download.url
+        download_val = f"{download_header}\n[➥ Descarga Directa (Roblox CDN)]({url})"
+
     embed.add_field(
-        name=_truncate(f"📦 {get_text(lang, 'download_header')}", _LIMIT_FIELD_NAME),
-        value=_truncate(f"**[{ctx.download.label}]({ctx.download.url})**", _LIMIT_FIELD_VALUE),
-        inline=False,
+         name="\u200b", # Empty name for spacing
+         value=_truncate(download_val, _LIMIT_FIELD_VALUE),
+         inline=False,
     )
 
     embed.set_thumbnail(url=ctx.icon_url)
     embed.set_footer(
-        text=_truncate(f"BloxPulse {BOT_VERSION} · Professional Monitoring", _LIMIT_FOOTER),
+        text=_truncate(f"BloxPulse v{BOT_VERSION} - Professional Monitoring | {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC", _LIMIT_FOOTER),
         icon_url=avatar,
     )
 

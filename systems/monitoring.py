@@ -108,94 +108,66 @@ class MonitoringSystem(commands.Cog):
         3. Detect official updates and pre-release builds.
         4. Broadcast any changes to guilds.
         """
-        loop    = asyncio.get_running_loop()
-        results = await loop.run_in_executor(None, fetch_all)
-
-        health_changed = self._sync_api_health(results)
-
-        # Build a list of broadcast coroutines and await them concurrently
+        from config import MONITORED_CHANNELS, PC_STUDIO_PLATFORMS, PLATFORMS
+        loop = asyncio.get_running_loop()
         broadcasts: list[asyncio.coroutine] = []
+        polling_results: dict[str, Optional[VersionInfo]] = {}
 
-        for platform_key, vi in results.items():
-            if vi is None:
-                log.warning("No version data returned for %s", platform_key)
-                continue
+        # ── Polling all platforms and channels ────────────────────────────────
+        for platform_key in PLATFORMS:
+            # Determine which channels to poll for this platform
+            channels = MONITORED_CHANNELS if platform_key in PC_STUDIO_PLATFORMS else ["LIVE"]
 
-            state         = get_version_data(platform_key)
-            old_hash      = state.get("last_update", "")
-            current_hash  = vi.version_hash
+            for channel in channels:
+                vi = await loop.run_in_executor(None, fetch_version, platform_key, channel)
+                
+                # Store the LIVE version info for health syncing
+                if channel == "LIVE":
+                    polling_results[platform_key] = vi
+                
+                if vi is None:
+                    continue
 
-            # ── Official update ────────────────────────────────────────────────
-            if not old_hash:
-                log.info("Initialising version record for %s → %s", platform_key, current_hash)
-                update_version(platform_key, current_hash, is_official=True)
+                state         = get_version_data(platform_key, channel=channel)
+                old_hash      = state.get("last_update", "")
+                old_fflags    = state.get("fflag_count", 0)
+                current_hash  = vi.version_hash
+                current_flags = vi.fflag_count
 
-            elif old_hash != current_hash:
-                log.info(
-                    "🆕 Official update detected: %s  %s → %s",
-                    platform_key, old_hash[:20], current_hash[:20],
-                )
-                update_version(platform_key, current_hash, is_official=True)
-                broadcasts.append(
-                    self._broadcast(platform_key, vi, prev_hash=old_hash, is_build=False)
-                )
+                # Detect changes (Official version or FFlags)
+                is_version_change = old_hash and old_hash != current_hash
+                is_fflag_change   = old_fflags != 0 and old_fflags != current_flags
+                
+                if not old_hash:
+                    log.info("Initialising [%s:%s] version → %s", platform_key, channel, current_hash)
+                    self._update_local_state(platform_key, channel, vi)
+                
+                elif is_version_change or is_fflag_change:
+                    if is_version_change:
+                        log.info("🆕 Update [%s:%s]: %s → %s", platform_key, channel, old_hash[:10], current_hash[:10])
+                    if is_fflag_change:
+                        log.info("🛠️ FFlag change [%s:%s]: %d → %d", platform_key, channel, old_fflags, current_flags)
 
-            # ── Pre-release build detection ───────────────────────────────────
-            if platform_key in _BUILD_DETECTION_PLATFORMS:
-                build_coro = await self._check_build(platform_key, vi, state)
-                if build_coro:
-                    broadcasts.append(build_coro)
+                    self._update_local_state(platform_key, channel, vi)
+                    
+                    broadcasts.append(
+                        self._broadcast(platform_key, vi, prev_hash=old_hash, is_build=False, channel=channel)
+                    )
 
         if broadcasts:
             await asyncio.gather(*broadcasts, return_exceptions=True)
 
+        # Update API health based on LIVE channels
+        health_changed = self._sync_api_health(polling_results)
         if health_changed:
             await self._refresh_all_status_channels()
 
-    async def _check_build(
-        self,
-        platform_key: str,
-        vi:           VersionInfo,
-        state:        dict,
-    ) -> Optional[asyncio.coroutine]:
-        """
-        Compare the latest DeployHistory.txt entry against what we have stored.
-        Returns a broadcast coroutine if a new build was found, else None.
-        """
-        loop = asyncio.get_running_loop()
-        try:
-            history: list[HistoryEntry] = await loop.run_in_executor(
-                None, fetch_deploy_history, platform_key, 1
-            )
-        except Exception as exc:
-            log.warning("Build detection fetch failed for %s: %s", platform_key, exc)
-            return None
-
-        if not history:
-            return None
-
-        latest       = history[0]
-        build_hash   = latest.version_hash
-        old_build    = state.get("last_build", "")
-
-        if build_hash == old_build or build_hash == vi.version_hash:
-            return None
-
-        log.info(
-            "🛠️  Pre-release build detected: %s → %s",
-            platform_key, build_hash[:20],
-        )
-        update_version(platform_key, build_hash, is_official=False)
-
-        build_vi = VersionInfo(
-            platform_key=platform_key,
-            version=latest.version,
-            version_hash=build_hash,
-            channel="Build-Testing",
-            source="DeployHistory.txt",
-        )
-        prev = old_build or state.get("last_update", "")
-        return self._broadcast(platform_key, build_vi, prev_hash=prev, is_build=True)
+    async def _update_local_state(self, platform_key: str, channel: str, vi: VersionInfo) -> None:
+        """Helper to sync storage with discovered VersionInfo."""
+        update_version(platform_key, vi.version_hash, is_official=True, channel=channel, fflag_count=vi.fflag_count)
+        # We need a new storage method or update update_version to store fflag_count
+        # For now, let's assume update_version handles it or we'll add it.
+        # I'll update core/storage.py to support extra metadata.
 
     # ── Broadcast ─────────────────────────────────────────────────────────────
 
@@ -205,6 +177,7 @@ class MonitoringSystem(commands.Cog):
         vi:           VersionInfo,
         prev_hash:    str,
         is_build:     bool,
+        channel:      str = "LIVE",
     ) -> None:
         """
         Send an update embed to every configured guild channel.
@@ -230,8 +203,8 @@ class MonitoringSystem(commands.Cog):
             channel_id = cfg.get("channel_id")
             if not channel_id:
                 continue
-            channel = self.bot.get_channel(int(channel_id))
-            if not isinstance(channel, discord.TextChannel):
+            discord_channel = self.bot.get_channel(int(channel_id))
+            if not isinstance(discord_channel, discord.TextChannel):
                 log.debug("Guild %s: channel %s not found or not a TextChannel", gid_str, channel_id)
                 continue
 
@@ -245,11 +218,12 @@ class MonitoringSystem(commands.Cog):
                 bot_icon=avatar_url,
                 is_build=is_build,
                 history_data=history_data,
+                channel=channel,
             )
             view = create_language_view(platform_key, vi, prev_hash, lang)
 
             send_tasks.append(
-                self._safe_send(channel, content=mention, embed=embed, view=view, gid=gid_str)
+                self._safe_send(discord_channel, content=mention, embed=embed, view=view, gid=gid_str)
             )
 
         if send_tasks:
@@ -317,12 +291,12 @@ class MonitoringSystem(commands.Cog):
             return
 
         desired: dict[str, str] = {
-            "Members:":    f"⬢ Members: {guild.member_count:,}",
-            "Bot Version:": f"⬢ Bot Version: {BOT_VERSION}",
-            "Windows:":    f"⬢ Windows: {'Online' if API_STATUS.get('WindowsPlayer') else 'Offline'}",
-            "Mac:":        f"⬢ Mac: {'Online' if API_STATUS.get('MacPlayer') else 'Offline'}",
-            "Android:":    f"⬢ Android: {'Online' if API_STATUS.get('AndroidApp') else 'Offline'}",
-            "iOS:":        f"⬢ iOS: {'Online' if API_STATUS.get('iOS') else 'Offline'}",
+            "Members:":    f"》 Members: {guild.member_count}",
+            "Bot Version:": f"》 Bot Version: {BOT_VERSION}",
+            "Windows:":    f"》 Windows: {'🟢' if API_STATUS.get('WindowsPlayer') else '🔴'}",
+            "Mac:":        f"》 Mac: {'🟢' if API_STATUS.get('MacPlayer') else '🔴'}",
+            "Android:":    f"》 Android: {'🟢' if API_STATUS.get('AndroidApp') else '🔴'}",
+            "iOS:":        f"》 iOS: {'🟢' if API_STATUS.get('iOS') else '🔴'}",
         }
 
         for channel in guild.voice_channels:

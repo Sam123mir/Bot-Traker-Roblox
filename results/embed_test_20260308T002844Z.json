@@ -1,0 +1,165 @@
+{
+  "suite": "BloxPulse Embed Test Suite",
+  "generated": "2026-03-08T00:28:44.042967+00:00",
+  "elapsed_s": 0.005,
+  "dry_run": true,
+  "platforms": [
+    "WindowsPlayer",
+    "MacPlayer",
+    "AndroidApp",
+    "iOS"
+  ],
+  "scenarios": [
+    "update",
+    "welcome",
+    "startup",
+    "announce",
+    "history",
+    "mobile",
+    "prerelease"
+  ],
+  "summary": {
+    "total": 17,
+    "passed": 17,
+    "failed": 0,
+    "skipped": 0
+  },
+  "results": [
+    {
+      "scenario": "update",
+      "platform": "WindowsPlayer",
+      "status": "PASSED",
+      "duration_ms": 0.3318999952170998,
+      "error": null,
+      "notes": "embed built and sent"
+    },
+    {
+      "scenario": "history",
+      "platform": "WindowsPlayer",
+      "status": "PASSED",
+      "duration_ms": 0.2001999964704737,
+      "error": null,
+      "notes": "history block with 3 entries"
+    },
+    {
+      "scenario": "prerelease",
+      "platform": "WindowsPlayer",
+      "status": "PASSED",
+      "duration_ms": 0.13270000636111945,
+      "error": null,
+      "notes": "pre-release build embed"
+    },
+    {
+      "scenario": "update",
+      "platform": "MacPlayer",
+      "status": "PASSED",
+      "duration_ms": 0.12280000373721123,
+      "error": null,
+      "notes": "embed built and sent"
+    },
+    {
+      "scenario": "history",
+      "platform": "MacPlayer",
+      "status": "PASSED",
+      "duration_ms": 0.11439999798312783,
+      "error": null,
+      "notes": "history block with 3 entries"
+    },
+    {
+      "scenario": "prerelease",
+      "platform": "MacPlayer",
+      "status": "PASSED",
+      "duration_ms": 0.11810001160483807,
+      "error": null,
+      "notes": "pre-release build embed"
+    },
+    {
+      "scenario": "update",
+      "platform": "AndroidApp",
+      "status": "PASSED",
+      "duration_ms": 0.10550000297371298,
+      "error": null,
+      "notes": "embed built and sent"
+    },
+    {
+      "scenario": "history",
+      "platform": "AndroidApp",
+      "status": "PASSED",
+      "duration_ms": 0.1272000081371516,
+      "error": null,
+      "notes": "history block with 3 entries"
+    },
+    {
+      "scenario": "prerelease",
+      "platform": "AndroidApp",
+      "status": "PASSED",
+      "duration_ms": 0.08450000314041972,
+      "error": null,
+      "notes": "pre-release build embed"
+    },
+    {
+      "scenario": "mobile",
+      "platform": "AndroidApp",
+      "status": "PASSED",
+      "duration_ms": 0.07189999450929463,
+      "error": null,
+      "notes": "mobile layout verified"
+    },
+    {
+      "scenario": "update",
+      "platform": "iOS",
+      "status": "PASSED",
+      "duration_ms": 0.09220000356435776,
+      "error": null,
+      "notes": "embed built and sent"
+    },
+    {
+      "scenario": "history",
+      "platform": "iOS",
+      "status": "PASSED",
+      "duration_ms": 0.09059999138116837,
+      "error": null,
+      "notes": "history block with 3 entries"
+    },
+    {
+      "scenario": "prerelease",
+      "platform": "iOS",
+      "status": "PASSED",
+      "duration_ms": 0.05050000618211925,
+      "error": null,
+      "notes": "pre-release build embed"
+    },
+    {
+      "scenario": "mobile",
+      "platform": "iOS",
+      "status": "PASSED",
+      "duration_ms": 0.10820000898092985,
+      "error": null,
+      "notes": "mobile layout verified"
+    },
+    {
+      "scenario": "welcome",
+      "platform": null,
+      "status": "PASSED",
+      "duration_ms": 0.0032999960239976645,
+      "error": null,
+      "notes": "skipped (requires live discord.Member \u2013 use integration test)"
+    },
+    {
+      "scenario": "announce",
+      "platform": null,
+      "status": "PASSED",
+      "duration_ms": 0.042800005758181214,
+      "error": null,
+      "notes": "announcement embed built"
+    },
+    {
+      "scenario": "startup",
+      "platform": null,
+      "status": "PASSED",
+      "duration_ms": 0.0020000006770715117,
+      "error": null,
+      "notes": "dry-run: startup send skipped"
+    }
+  ]
+}

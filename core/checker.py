@@ -47,6 +47,7 @@ class VersionInfo:
     source:       str  = ""
     raw:          dict = field(default_factory=dict)
     components:   list[str] = field(default_factory=list)
+    fflag_count:  int = 0
 
     # ── Computed properties ────────────────────────────────────────────────────
 
@@ -188,97 +189,73 @@ def _fetch_manifest(platform_key: str, version_hash: str) -> list[str]:
 #  Source functions
 # ──────────────────────────────────────────────────────────────────────────────
 
-def _cdn_url_for(platform_key: str, channel: str) -> Optional[str]:
-    """Build the CDN endpoint URL for a given platform and channel."""
-    if platform_key == "WindowsPlayer":
-        base = "https://setup.rbxcdn.com"
-        path = "/version" if channel == "LIVE" else f"/channel/{channel}/version"
-    elif platform_key == "MacPlayer":
-        base = "https://setup.rbxcdn.com/mac"
-        path = "/version" if channel == "LIVE" else f"/../channel/{channel}/mac/version"
-    else:
+def _from_maximumadhd(
+    platform_key: str,
+    cfg:          dict,
+    channel:      str = "LIVE",
+) -> Optional[VersionInfo]:
+    """
+    Primary source inspired by MaximumADHD's trackers.
+    Fetches version and GUID from GitHub raw content (Roblox-Client-Tracker).
+    Only supports LIVE channel as Maximum usually tracks live production builds.
+    """
+    if channel != "LIVE":
         return None
-    return base + path
 
+    # Branch mapping for MaximumADHD/Roblox-Client-Tracker
+    branch_map = {
+        "WindowsPlayer": "roblox",
+        "MacPlayer":     "mac-roblox",
+        "WindowsStudio": "studio",
+        "MacStudio":     "mac-studio",
+    }
+    branch = branch_map.get(platform_key)
+    if not branch:
+        return None
 
-def _pretty_version_from_api(platform_key: str, version_hash: str, channel: str) -> str:
-    """
-    Try to get a human-readable version string from the Client Settings API.
-    Falls back to the hash history, then to the raw hash if nothing works.
-    """
-    cfg     = PLATFORMS[platform_key]
-    api_key = cfg.get("api_key", platform_key)
-    url     = (
-        f"https://clientsettingscdn.roblox.com/v2/client-version"
-        f"/{api_key}/channel/{channel}"
-    )
-    data    = _get_json(url)
-    version = (data or {}).get("version", "")
-
-    if version and not version.startswith("version-") and len(version) >= 5:
-        return version
-
-    # Try to match in deploy history
     try:
-        from .history import fetch_deploy_history
-        for entry in fetch_deploy_history(platform_key, days=7):
-            if entry.version_hash == version_hash:
-                log.debug(
-                    "Resolved pretty version from history for %s: %s",
-                    platform_key, entry.version,
-                )
-                return entry.version
+        base_url = f"https://raw.githubusercontent.com/MaximumADHD/Roblox-Client-Tracker/{branch}"
+        version  = _get_text(f"{base_url}/version.txt")
+        guid     = _get_text(f"{base_url}/version-guid.txt")
+
+        if not version or not guid:
+            return None
+
+        # FFlag count from Roblox-FFlag-Tracker
+        fflag_file_map = {
+            "WindowsPlayer": "PCDesktopClient.json",
+            "WindowsStudio": "StudioApp.json",
+            "MacPlayer":     "MacDesktopClient.json",
+            "MacStudio":     "MacStudioApp.json",
+        }
+        fflag_file = fflag_file_map.get(platform_key)
+        ff_count   = 0
+        if fflag_file:
+            ff_data = _get_json(f"https://raw.githubusercontent.com/MaximumADHD/Roblox-FFlag-Tracker/main/{fflag_file}")
+            ff_count = len(ff_data) if ff_data else 0
+
+        return VersionInfo(
+            platform_key=platform_key,
+            version=version.strip(),
+            version_hash=guid.strip(),
+            channel=channel,
+            source="MaximumADHD API",
+            raw={"version": version, "guid": guid},
+            fflag_count=ff_count,
+        )
     except Exception as exc:
-        log.debug("History lookup failed during version resolution: %s", exc)
-
-    # Last resort: strip the prefix and use the hash fragment as the version
-    return version_hash.replace("version-", "")
-
-
-def _from_cdn(
-    platform_key: str,
-    cfg:          dict,
-    channel:      str = "LIVE",
-) -> Optional[VersionInfo]:
-    """
-    Primary source for Windows and Mac.
-    Fetches the version hash from setup.rbxcdn.com, then resolves
-    the human-readable version from the Client Settings API.
-    """
-    cdn_url = _cdn_url_for(platform_key, channel)
-    if not cdn_url:
+        log.warning("MaximumADHD API fetch failed for %s: %s", platform_key, exc)
         return None
 
-    version_hash = _get_text(cdn_url)
-    if not version_hash or not version_hash.startswith("version-"):
-        log.warning(
-            "Unexpected CDN response for %s [%s]: %r – trying API fallback",
-            platform_key, channel, version_hash,
-        )
-        return _from_roblox_api(platform_key, cfg, channel)
 
-    version    = _pretty_version_from_api(platform_key, version_hash, channel)
-    components = _fetch_manifest(platform_key, version_hash)
-
-    return VersionInfo(
-        platform_key=platform_key,
-        version=version,
-        version_hash=version_hash,
-        channel=channel,
-        source="Roblox CDN",
-        raw={"hash": version_hash, "version": version, "channel": channel},
-        components=components,
-    )
-
-
-def _from_roblox_api(
+def _from_deployment_api(
     platform_key: str,
     cfg:          dict,
     channel:      str = "LIVE",
 ) -> Optional[VersionInfo]:
     """
-    Fallback: Client Settings CDN API.
-    Used when the raw CDN endpoint returns unexpected data.
+    Secondary/Fallback source for PC, Mac, and Studio platforms.
+    Polls the official Roblox Client Settings API for deployment info.
     """
     api_key = cfg.get("api_key", platform_key)
     url     = (
@@ -288,17 +265,49 @@ def _from_roblox_api(
     data    = _get_json(url)
 
     if not data or "clientVersionUpload" not in data:
-        log.error("Client Settings API returned no usable data for %s", platform_key)
+        log.warning("Deployment API returned no usable data for %s [%s]", platform_key, channel)
         return None
+
+    version_hash = data["clientVersionUpload"]
+    version      = data.get("version", version_hash.replace("version-", ""))
+    
+    # FFlags from Roblox API (Fallback)
+    fflags      = _fetch_fflags(platform_key, channel)
+    fflag_count = len(fflags.get("applicationSettings", {})) if fflags else 0
 
     return VersionInfo(
         platform_key=platform_key,
-        version=data.get("version", ""),
-        version_hash=data.get("clientVersionUpload", ""),
+        version=version,
+        version_hash=version_hash,
         channel=channel,
-        source="Roblox Client Settings API",
+        source="Roblox Deployment API",
         raw=data,
+        fflag_count=fflag_count,
     )
+
+
+def _fetch_fflags(platform_key: str, channel: str) -> Optional[dict]:
+    """
+    Fetch the current FFlags for a given platform and channel.
+    Maps platform_key to internal Roblox application names.
+    """
+    app_map = {
+        "WindowsPlayer": "PCDesktopClient",
+        "WindowsStudio": "PCStudioApp",
+        "MacPlayer":     "MacDesktopClient",
+        "MacStudio":     "MacStudioApp",
+    }
+    app_name = app_map.get(platform_key)
+    if not app_name:
+        return None
+
+    url = (
+        f"https://clientsettings.roblox.com/v1/settings/application"
+        f"?applicationName={app_name}&channel={channel}"
+    )
+    return _get_json(url)
+
+
 
 
 def _from_appstore(
@@ -406,8 +415,7 @@ def _from_playstore(
 
 # Maps the "source" config key to the corresponding fetch function
 _SOURCE_DISPATCH = {
-    "cdn":        _from_cdn,
-    "roblox_api": _from_roblox_api,
+    "roblox_api": _from_deployment_api,
     "appstore":   _from_appstore,
     "playstore":  _from_playstore,
 }
@@ -421,40 +429,40 @@ def fetch_version(
     channel:      str = "LIVE",
 ) -> Optional[VersionInfo]:
     """
-    Fetch the current version for a single platform.
-
-    Parameters
-    ----------
-    platform_key : Must be a key present in PLATFORMS config.
-    channel      : Release channel identifier (default "LIVE").
-
-    Returns
-    -------
-    VersionInfo on success, None if the platform is unknown or all sources fail.
+    Main entry point for fetching a specific platform's version.
+    Priority:
+    1. MaximumADHD API (GitHub) for PC/Studio LIVE.
+    2. Roblox Deployment API (Fallback/Other channels).
+    3. platform-specific stores (Mobile).
     """
     cfg = PLATFORMS.get(platform_key)
-    if cfg is None:
-        log.error("fetch_version: unknown platform '%s'", platform_key)
+    if not cfg:
+        log.error("fetch_version: Unknown platform key: %r", platform_key)
         return None
 
-    source_name = cfg.get("source")
-    source_fn   = _SOURCE_DISPATCH.get(source_name)
-    if source_fn is None:
-        log.error(
-            "fetch_version: unknown source '%s' for platform '%s'",
-            source_name, platform_key,
-        )
+    source_id = cfg["source"]
+    
+    # ── Source Dispatch ───────────────────────────────────────────────────────
+    
+    # Special case: MaximumADHD priority for PC/Studio LIVE
+    if source_id == "roblox_api" and channel == "LIVE":
+        vi = _from_maximumadhd(platform_key, cfg, channel)
+        if vi:
+            return vi
+        # Fallback to normal Roblox API if MaximumADHD fails
+        log.info("MaximumADHD API failed/unavailable, falling back to Roblox API for %s", platform_key)
+
+    fetch_fn = _SOURCE_DISPATCH.get(source_id)
+    if not fetch_fn:
+        log.error("No fetch function defined for source: %s", source_id)
         return None
 
-    if source_name in _CHANNEL_AWARE_SOURCES:
-        result = source_fn(platform_key, cfg, channel)
-    else:
-        result = source_fn(platform_key, cfg)
+    result = fetch_fn(platform_key, cfg, channel) if source_id in _CHANNEL_AWARE_SOURCES else fetch_fn(platform_key, cfg)
 
     if result is None:
         log.warning("fetch_version: all sources failed for %s [channel=%s]", platform_key, channel)
     else:
-        log.debug("fetch_version: %s", result)
+        log.debug("fetch_version: successful for %s", platform_key)
 
     return result
 

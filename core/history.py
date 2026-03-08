@@ -310,8 +310,8 @@ def make_rdd_url(
 
     Note
     ----
-    RDD (rdd.latte.to) is a third-party service. It may occasionally return
-    403 responses for very new or very old versions.
+    RDD (rdd.latte.to) is a third-party service. If it returns 403,
+    use a direct Roblox CDN link instead.
     """
     binary_type = _RDD_BINARY_MAP.get(platform_key)
     if not binary_type:
@@ -319,6 +319,7 @@ def make_rdd_url(
         return None
 
     clean_hash = version_hash.strip()
-    url = f"https://rdd.latte.to/?channel={channel}&binaryType={binary_type}&version={clean_hash}"
+    # Use /download endpoint which is more robust for direct parsing
+    url = f"https://rdd.latte.to/download?channel={channel}&binaryType={binary_type}&version={clean_hash}"
     log.debug("make_rdd_url: %s", url)
     return url

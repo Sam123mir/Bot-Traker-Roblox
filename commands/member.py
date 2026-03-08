@@ -153,7 +153,7 @@ class MemberCommands(commands.Cog):
         self.bot = bot
 
     @app_commands.command(name="help", description="📖 All command details & features for members and owners.")
-    async def help_cmd(interaction: discord.Interaction):
+    async def help_cmd(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         lang = get_guild_config(interaction.guild_id).get("language", "en")
         
@@ -185,8 +185,11 @@ class MemberCommands(commands.Cog):
             name=get_text(lang, "admin_cmds"),
             value=(
                 "`/setup alerts` — Configure update channel\n"
+                "`/setup server` — Professional template setup\n"
                 "`/setup announcements` — Set news channel\n"
-                "`/setup welcome` — Configure welcome messages\n"
+                "`/setup member-count` — Set dynamic voice counter\n"
+                "`/welcome_system` — Consolidated welcome config\n"
+                "`/welcome_test` — Preview welcome message\n"
                 "`/language` — Change server language\n"
                 "`/config` — View current server settings"
             ),
@@ -292,10 +295,12 @@ class MemberCommands(commands.Cog):
     @app_commands.command(name="download", description="Get the download link for the current Roblox version.")
     @app_commands.describe(platform="Platform to download")
     @app_commands.choices(platform=[
-        app_commands.Choice(name="⬢ Windows", value="windows"),
-        app_commands.Choice(name="⬢ macOS",   value="mac"),
-        app_commands.Choice(name="⬢ Android", value="android"),
-        app_commands.Choice(name="⬢ iOS",     value="ios"),
+        app_commands.Choice(name="⬢ Windows Client", value="windows"),
+        app_commands.Choice(name="⬢ Windows Studio", value="studio"),
+        app_commands.Choice(name="⬢ macOS Client",   value="mac"),
+        app_commands.Choice(name="⬢ macOS Studio",   value="mac_studio"),
+        app_commands.Choice(name="⬢ Android",        value="android"),
+        app_commands.Choice(name="⬢ iOS",            value="ios"),
     ])
     async def download(self, interaction: discord.Interaction, platform: str):
         await interaction.response.defer(ephemeral=True)
@@ -318,13 +323,31 @@ class MemberCommands(commands.Cog):
 
         if vi:
             short = vi.version_hash.replace("version-", "")
-            embed.add_field(name="𖤘 Version",   value=f"`{vi.version}`",  inline=True)
-            embed.add_field(name="⚿ Build Hash", value=f"`{short[:16]}…`", inline=True)
-            embed.add_field(name="\u200b",        value="\u200b",            inline=True)
+            embed.description = (
+                f"🚀 **Build:** `{vi.version_hash}`\n"
+                f"🔢 **Versión:** `{vi.version}`"
+            )
+            if vi.fflag_count > 0:
+                embed.description += f"\n🛠️ **FFlags:** `{vi.fflag_count}`"
 
-            rdd_url = make_rdd_url(platform_key, vi.version_hash)
-            if rdd_url:
-                embed.add_field(name="↳ Download Link", value=f"**[➥ Download {label} via RDD]({rdd_url})**\n*Direct from Roblox CDN*", inline=False)
+            if platform_key in ["WindowsPlayer", "WindowsStudio", "MacPlayer", "MacStudio"]:
+                # The MaximumADHD direct link style with channel support
+                channel = vi.channel
+                base_cdn = "https://setup.rbxcdn.com"
+                if channel and channel != "LIVE":
+                    base_cdn += f"/channel/{channel.lower()}"
+
+                prefix = "" if "Windows" in platform_key else "mac/"
+                suffix = "RobloxPlayerLauncher.exe" if "Player" in platform_key else "RobloxStudioLauncherBeta.exe"
+                if "Mac" in platform_key:
+                    suffix = "RobloxPlayer.zip" if "Player" in platform_key else "RobloxStudio.zip"
+
+                direct_url = f"{base_cdn}/{prefix}{vi.version_hash}-{suffix}"
+                embed.add_field(
+                    name="📥 Enlace de Descarga", 
+                    value=f"**[➥ Descargar {label} (Directo)]({direct_url})**", 
+                    inline=False
+                )
             elif platform == "android":
                 embed.add_field(name="↳ Google Play Store", value="**[➥ Open on Google Play](https://play.google.com/store/apps/details?id=com.roblox.client)**", inline=False)
             elif platform == "ios":

@@ -101,8 +101,8 @@ DEFAULT_LANGUAGE:  Final[str] = _env("BLOXPULSE_LANGUAGE", default="en")
 #  Monitoring intervals
 # ──────────────────────────────────────────────────────────────────────────────
 
-CHECK_INTERVAL:   Final[int] = _env_int("CHECK_INTERVAL",   default=300)   # 5 min
-HEARTBEAT_EVERY:  Final[int] = _env_int("HEARTBEAT_EVERY",  default=3600)  # 1 hour
+CHECK_INTERVAL:      Final[int] = _env_int("CHECK_INTERVAL",   default=60)    # 1 min (Polling)
+HEARTBEAT_EVERY:     Final[int] = _env_int("HEARTBEAT_EVERY",  default=3600)  # 1 hour
 REQUEST_TIMEOUT:  Final[int] = _env_int("REQUEST_TIMEOUT",  default=10)
 RETRY_ATTEMPTS:   Final[int] = _env_int("RETRY_ATTEMPTS",   default=3)
 RETRY_DELAY:      Final[int] = _env_int("RETRY_DELAY",      default=5)
@@ -161,15 +161,29 @@ PLATFORMS: Final[dict[str, dict]] = {
         "label":    "Windows (PC)",
         "color":    0x0078D4,
         "icon_url": "https://cdn-icons-png.flaticon.com/512/882/882702.png",
-        "source":   "cdn",
+        "source":   "roblox_api",
         "api_key":  "WindowsPlayer",
     },
+    "WindowsStudio": {
+        "label":    "Windows Studio",
+        "color":    0x00A2ED,
+        "icon_url": "https://cdn-icons-png.flaticon.com/512/18868/18868601.png",
+        "source":   "roblox_api",
+        "api_key":  "WindowsStudio",
+    },
     "MacPlayer": {
-        "label":    "macOS",
+        "label":    "macOS Client",
         "color":    0x636366,
         "icon_url": "https://cdn-icons-png.flaticon.com/512/2/2235.png",
-        "source":   "cdn",
+        "source":   "roblox_api",
         "api_key":  "MacPlayer",
+    },
+    "MacStudio": {
+        "label":    "macOS Studio",
+        "color":    0xA2A2A2,
+        "icon_url": "https://cdn-icons-png.flaticon.com/512/2/2235.png",
+        "source":   "roblox_api",
+        "api_key":  "MacStudio",
     },
     "AndroidApp": {
         "label":    "Android",
@@ -187,13 +201,23 @@ PLATFORMS: Final[dict[str, dict]] = {
     },
 }
 
+# Deployment channels to track for each PC/Studio platform
+MONITORED_CHANNELS: Final[list[str]] = ["LIVE", "znext", "zintegration"]
+
+# Platforms that use the Deployment API source
+PC_STUDIO_PLATFORMS: Final[frozenset[str]] = frozenset({
+    "WindowsPlayer", "WindowsStudio", "MacPlayer", "MacStudio"
+})
+
 # ──────────────────────────────────────────────────────────────────────────────
 #  API platform alias mapping  (short alias → internal key)
 # ──────────────────────────────────────────────────────────────────────────────
 
 API_PLATFORM_MAPPING: Final[dict[str, str]] = {
-    "windows": "WindowsPlayer",
-    "mac":     "MacPlayer",
-    "android": "AndroidApp",
-    "ios":     "iOS",
+    "windows":    "WindowsPlayer",
+    "studio":     "WindowsStudio",
+    "mac":        "MacPlayer",
+    "mac_studio": "MacStudio",
+    "android":    "AndroidApp",
+    "ios":        "iOS",
 }
