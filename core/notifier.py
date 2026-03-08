@@ -664,7 +664,13 @@ class VersionSelect(Select):
         if latest and latest not in history:
             history.insert(0, latest)
             
-        cur = current_hash or latest
+        if current_hash and current_hash not in history:
+            history.insert(0, current_hash)
+            
+        if not history:
+            history.append(current_hash or "unknown-version")
+            
+        cur = current_hash or latest or history[0]
         
         options = [
             discord.SelectOption(
@@ -719,11 +725,9 @@ def build_alert_view(
     view = View(timeout=None)
     view.add_item(LanguageSelect(platform_key, vi, prev_hash, current_lang, current_hash))
     
-    state = get_version_data(platform_key, channel=vi.channel) or {}
-    if state.get("history") or state.get("current"):
-        view.add_item(VersionSelect(
-            platform_key, vi, prev_hash, current_lang, current_hash
-        ))
+    view.add_item(VersionSelect(
+        platform_key, vi, prev_hash, current_lang, current_hash
+    ))
     
     return view
 
