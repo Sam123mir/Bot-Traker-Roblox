@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -43,6 +44,25 @@ API_STATUS: dict[str, bool] = {
     "AndroidApp":    True,
     "iOS":           True,
 }
+
+API_LATENCY: dict[str, Optional[int]] = {
+    "WindowsPlayer": None,
+    "MacPlayer":     None,
+    "AndroidApp":    None,
+    "iOS":           None,
+}
+
+def get_latency_emoji(latency_ms: Optional[int]) -> str:
+    """Return an emoji based on API response time in ms."""
+    if latency_ms is None:
+        return '🔴'  # Offline / Error
+    if latency_ms < 600:
+        return '🟢'  # Fast
+    if latency_ms < 1500:
+        return '🟡'  # Normal
+    if latency_ms < 3000:
+        return '🟠'  # Slow
+    return '🔴'      # Very slow
 
 # Platforms that support pre-release build detection via DeployHistory.txt
 _BUILD_DETECTION_PLATFORMS: frozenset[str] = frozenset({"WindowsPlayer", "MacPlayer"})
@@ -112,6 +132,7 @@ class MonitoringSystem(commands.Cog):
         loop = asyncio.get_running_loop()
         broadcasts: list[asyncio.coroutine] = []
         polling_results: dict[str, Optional[VersionInfo]] = {}
+        polling_latency: dict[str, int] = {}
 
         # ── Polling all platforms and channels ────────────────────────────────
         for platform_key in PLATFORMS:
@@ -119,11 +140,15 @@ class MonitoringSystem(commands.Cog):
             channels = MONITORED_CHANNELS if platform_key in PC_STUDIO_PLATFORMS else ["LIVE"]
 
             for channel in channels:
+                start_time = time.perf_counter()
                 vi = await loop.run_in_executor(None, fetch_version, platform_key, channel)
+                elapsed_ms = int((time.perf_counter() - start_time) * 1000)
                 
                 # Store the LIVE version info for health syncing
                 if channel == "LIVE":
                     polling_results[platform_key] = vi
+                    if vi is not None:
+                        polling_latency[platform_key] = elapsed_ms
                 
                 if vi is None:
                     continue
@@ -158,7 +183,7 @@ class MonitoringSystem(commands.Cog):
             await asyncio.gather(*broadcasts, return_exceptions=True)
 
         # Update API health based on LIVE channels
-        health_changed = self._sync_api_health(polling_results)
+        health_changed = self._sync_api_health(polling_results, polling_latency)
         if health_changed:
             await self._refresh_all_status_channels()
 
@@ -266,22 +291,32 @@ class MonitoringSystem(commands.Cog):
 
     # ── API health sync ───────────────────────────────────────────────────────
 
-    def _sync_api_health(self, results: dict[str, Optional[VersionInfo]]) -> bool:
+    def _sync_api_health(self, results: dict[str, Optional[VersionInfo]], latency: dict[str, int]) -> bool:
         """
-        Update global API_STATUS from the latest fetch results.
-        Returns True if any status changed.
+        Update global API_STATUS and API_LATENCY from the latest fetch results.
+        Returns True if the emoji bucket changed (to avoid hitting Discord rename limits on tiny latency shifts).
         """
         changed = False
         for platform_key in list(API_STATUS.keys()):
             online = results.get(platform_key) is not None
+            current_latency = latency.get(platform_key) if online else None
+            
+            old_emoji = get_latency_emoji(API_LATENCY.get(platform_key) if API_STATUS.get(platform_key) else None)
+            new_emoji = get_latency_emoji(current_latency if online else None)
+            
             if API_STATUS[platform_key] != online:
                 API_STATUS[platform_key] = online
+                
+            if API_LATENCY.get(platform_key) != current_latency:
+                API_LATENCY[platform_key] = current_latency
+                
+            if old_emoji != new_emoji:
                 log.info(
-                    "API health change: %s is now %s",
-                    platform_key,
-                    "ONLINE" if online else "OFFLINE",
+                    "API latency emoji for %s changed: %s -> %s (%sms)",
+                    platform_key, old_emoji, new_emoji, current_latency or "N/A"
                 )
                 changed = True
+                
         return changed
 
     # ── Dynamic status channels ───────────────────────────────────────────────
@@ -308,10 +343,10 @@ class MonitoringSystem(commands.Cog):
         desired: dict[str, str] = {
             "Members:":    f"》 Members: {guild.member_count}",
             "Bot Version:": f"》 Bot Version: {BOT_VERSION}",
-            "Windows:":    f"》 Windows: {'🟢' if API_STATUS.get('WindowsPlayer') else '🔴'}",
-            "Mac:":        f"》 Mac: {'🟢' if API_STATUS.get('MacPlayer') else '🔴'}",
-            "Android:":    f"》 Android: {'🟢' if API_STATUS.get('AndroidApp') else '🔴'}",
-            "iOS:":        f"》 iOS: {'🟢' if API_STATUS.get('iOS') else '🔴'}",
+            "Windows:":    f"》 Windows: {get_latency_emoji(API_LATENCY.get('WindowsPlayer') if API_STATUS.get('WindowsPlayer') else None)}",
+            "Mac:":        f"》 Mac: {get_latency_emoji(API_LATENCY.get('MacPlayer') if API_STATUS.get('MacPlayer') else None)}",
+            "Android:":    f"》 Android: {get_latency_emoji(API_LATENCY.get('AndroidApp') if API_STATUS.get('AndroidApp') else None)}",
+            "iOS:":        f"》 iOS: {get_latency_emoji(API_LATENCY.get('iOS') if API_STATUS.get('iOS') else None)}",
         }
 
         for channel in guild.voice_channels:

@@ -41,6 +41,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "build_title": "Nueva build de Roblox detectada en {platform}!",
         "build_disclaimer": "⚠️ ESTO NO ES UNA ACTUALIZACIÓN DE ROBLOX",
         "build_intro": "*Roblox acaba de compilar una nueva versión! Esta versión podría ser la próxima actualización!*",
+        "goodbye_member_title": "✨ ¡Adiós, {user}!",
+        "goodbye_member_body": "⬢ **{user}** ha dejado nuestra comunidad. ⬢\n\n¡Te deseamos lo mejor! Ahora somos `{count}` miembros.",
+        "goodbye_member_footer": "BloxPulse | Monitoreo Profesional",
     },
     "en": {
         "update_title": "✨ Roblox {platform} Updated!",
@@ -74,6 +77,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "build_title": "New Roblox build detected on {platform}!",
         "build_disclaimer": "⚠️ THIS IS NOT A ROBLOX UPDATE",
         "build_intro": "*Roblox has just built a new version! This version might be the next update!*",
+        "goodbye_member_title": "✨ Farewell, {user}!",
+        "goodbye_member_body": "⬢ **{user}** has left our community. ⬢\n\nWe wish you the best! We now have `{count}` members.",
+        "goodbye_member_footer": "BloxPulse | Professional Monitoring",
     },
     "pt": {
         "update_title": "✨ Roblox {platform} Atualizado!",
@@ -94,6 +100,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "welcome_member_title": "✨ Bem-vindo ao {server}!",
         "welcome_member_body": "⬢ **Olá {user}** ⬢\n\nEstamos felizes em recebê-lo em nossa comunidade. Esperamos que você aproveite sua estadia!",
         "welcome_member_footer": "BloxPulse | Monitoramento Profissional",
+        "goodbye_member_title": "✨ Adeus, {user}!",
+        "goodbye_member_body": "⬢ **{user}** deixou nossa comunidade. ⬢\n\nDesejamos o melhor! Agora temos `{count}` membros.",
+        "goodbye_member_footer": "BloxPulse | Monitoramento Profissional",
     },
     "ru": {
         "update_title": "✨ Roblox {platform} обновлен!",
@@ -114,6 +123,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "welcome_member_title": "✨ Добро пожаловать в {server}!",
         "welcome_member_body": "⬢ **Привет {user}** ⬢\n\nМы рады приветствовать вас в нашем сообществе. Надеемся, вам здесь понравится!",
         "welcome_member_footer": "BloxPulse | Профессиональный мониторинг",
+        "goodbye_member_title": "✨ Прощай, {user}!",
+        "goodbye_member_body": "⬢ **{user}** покинул наше сообщество. ⬢\n\nЖелаем всего наилучшего! Теперь нас `{count}` участников.",
+        "goodbye_member_footer": "BloxPulse | Профессиональный мониторинг",
     },
     "fr": {
         "update_title": "✨ Roblox {platform} Mis à jour !",
@@ -134,6 +146,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "welcome_member_title": "✨ Bienvenue sur {server} !",
         "welcome_member_body": "⬢ **Bonjour {user}** ⬢\n\nNous sommes ravis de vous accueillir dans nuestra communauté. Nous espérons que vous apprécierez votre séjour !",
         "welcome_member_footer": "BloxPulse | Surveillance Professionnelle",
+        "goodbye_member_title": "✨ Adieu, {user} !",
+        "goodbye_member_body": "⬢ **{user}** a quitté notre communauté. ⬢\n\nNous vous souhaitons le meilleur ! Nous comptons désormais `{count}` membres.",
+        "goodbye_member_footer": "BloxPulse | Surveillance Professionnelle",
     }
 }
 

@@ -359,19 +359,22 @@ class WelcomeSystem(commands.Cog):
         if not target_channel:
             return
 
+        lang = cfg.get("language", "en")
+        title = get_text(lang, "goodbye_member_title", user=member.display_name)
+        body  = get_text(lang, "goodbye_member_body", user=member.display_name, count=f"{member.guild.member_count:,}")
+        footer_text = get_text(lang, "goodbye_member_footer")
+
         embed = discord.Embed(
-            description=(
-                f"**{member.display_name}** has left the server.\n"
-                f"We now have **{member.guild.member_count:,}** members."
-            ),
-            color=0x778ca3,
+            title=title,
+            description=body,
+            color=0xff4757, # A nice red/pink color for goodbyes
             timestamp=datetime.now(timezone.utc),
         )
-        embed.set_author(
-            name=f"{member.display_name} left",
-            icon_url=member.display_avatar.url,
+        embed.set_thumbnail(url=member.display_avatar.url)
+        embed.set_footer(
+            text=f"{footer_text} • ID: {member.id}",
+            icon_url=member.guild.icon.url if member.guild.icon else None,
         )
-        embed.set_footer(text=f"ID: {member.id}")
 
         try:
             await target_channel.send(embed=embed)
