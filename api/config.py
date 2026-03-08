@@ -33,7 +33,11 @@ class APIConfig:
     CORS_ORIGINS: list[str]     = field(default_factory=lambda: ["*"])
 
     # ── Misc ──────────────────────────────────────────────────────────────────
-    API_VERSION: str            = "v1"
+    API_VERSION: str            = "v2.0.0"
+    API_V1_PREFIX: str          = "/api/v1"
+    API_V2_PREFIX: str          = "/api/v2"
+
+    # Deprecated v1 prefix (for compatibility in some places)
     API_PREFIX: str             = "/api/v1"
 
 

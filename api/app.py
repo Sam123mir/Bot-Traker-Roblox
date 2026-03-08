@@ -25,7 +25,8 @@ from .config import config
 from .errors import register_error_handlers
 from .logging_setup import setup_api_logging
 from .middleware import register_middleware
-from .routes import admin_bp, health_bp, history_bp, stats_bp, status_bp, widget_bp
+from .v1_routes import admin_bp, health_bp, history_bp, stats_bp, status_bp, widget_bp
+from .v2 import v2_bp
 
 logger = logging.getLogger("BloxPulse.API")
 
@@ -57,6 +58,7 @@ def create_app(bot: Any = None) -> Flask:
     app.register_blueprint(history_bp)
     app.register_blueprint(widget_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(v2_bp)
 
     logger.info(
         "BloxPulse API ready  |  prefix=%s  rate=%d req/%ds  auth=%s",
