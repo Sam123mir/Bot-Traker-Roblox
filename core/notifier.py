@@ -121,13 +121,15 @@ def _resolve_download_link(
         base_cdn += f"/channel/{channel.lower()}"
 
     if platform_key == "WindowsPlayer":
-        direct = f"{base_cdn}/{version_hash}-RobloxPlayerLauncher.exe"
+        direct = f"{base_cdn}/{version_hash}-RobloxPlayerInstaller.exe"
         return _DownloadLink(
             label=get_text(lang, "download_windows"),
             url=f"{RDD_BASE}/download?channel={channel}&binaryType=WindowsPlayer&version={version_hash}",
             direct_url=direct
         )
     if platform_key == "MacPlayer":
+        # For Mac, Roblox typically uses Roblox.dmg or a specific zip. 
+        # RDD uses MacPlayer binary type which resolves to RobloxPlayer.zip
         direct = f"{base_cdn}/mac/{version_hash}-RobloxPlayer.zip"
         return _DownloadLink(
             label=get_text(lang, "download_macos"),
@@ -135,7 +137,7 @@ def _resolve_download_link(
             direct_url=direct
         )
     if platform_key == "WindowsStudio":
-        direct = f"{base_cdn}/{version_hash}-RobloxStudioLauncherBeta.exe"
+        direct = f"{base_cdn}/{version_hash}-RobloxStudioInstaller.exe"
         return _DownloadLink(
             label="Download Windows Studio",
             url=direct,

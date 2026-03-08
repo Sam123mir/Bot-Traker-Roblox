@@ -424,6 +424,19 @@ _SOURCE_DISPATCH = {
 _CHANNEL_AWARE_SOURCES = frozenset({"cdn", "roblox_api"})
 
 
+def _compare_versions(v1: str, v2: str) -> int:
+    """Returns 1 if v1 > v2, -1 if v1 < v2, 0 if equal."""
+    try:
+        p1 = [int(p) for p in v1.split('.')]
+        p2 = [int(p) for p in v2.split('.')]
+        for i in range(min(len(p1), len(p2))):
+            if p1[i] > p2[i]: return 1
+            if p1[i] < p2[i]: return -1
+        return 0
+    except Exception:
+        return 0
+
+
 def fetch_version(
     platform_key: str,
     channel:      str = "LIVE",
@@ -444,13 +457,21 @@ def fetch_version(
     
     # ── Source Dispatch ───────────────────────────────────────────────────────
     
-    # Special case: MaximumADHD priority for PC/Studio LIVE
+    # PC/Studio: Compare MaximumADHD vs Official API
     if source_id == "roblox_api" and channel == "LIVE":
-        vi = _from_maximumadhd(platform_key, cfg, channel)
-        if vi:
-            return vi
-        # Fallback to normal Roblox API if MaximumADHD fails
-        log.info("MaximumADHD API failed/unavailable, falling back to Roblox API for %s", platform_key)
+        vi_max = _from_maximumadhd(platform_key, cfg, channel)
+        vi_api = _from_deployment_api(platform_key, cfg, channel)
+        
+        if not vi_max: return vi_api
+        if not vi_api: return vi_max
+        
+        # Compare build numbers
+        if _compare_versions(vi_api.version, vi_max.version) > 0:
+            log.info("Official API is newer than MaximumADHD for %s (%s > %s)", platform_key, vi_api.version, vi_max.version)
+            # Use official metadata but keep FFlag count from Maximum if available
+            vi_api.fflag_count = vi_max.fflag_count
+            return vi_api
+        return vi_max
 
     fetch_fn = _SOURCE_DISPATCH.get(source_id)
     if not fetch_fn:
