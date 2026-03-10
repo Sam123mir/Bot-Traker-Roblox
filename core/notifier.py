@@ -336,15 +336,24 @@ def build_update_embed(
 
     # ── History field ─────────────────────────────────────────────────────────
     if history_data:
-        lines = "".join(
-            f"• `{h['hash']}` — {h['date']} UTC\n"
-            for h in history_data
-        )
-        embed.add_field(
-            name=_truncate(f"📜 {get_text(lang, 'history_header')}", _LIMIT_FIELD_NAME),
-            value=_truncate(lines or "No history available.", _LIMIT_FIELD_VALUE),
-            inline=False,
-        )
+        is_mobile = platform_key in _MOBILE_PLATFORMS
+        
+        # Windows / Mac: Hide history from body (too cluttered), move to dropdown only
+        # Mobile: Limit to last 3 entries in body
+        if is_mobile:
+            display_history = history_data[:3]
+            lines = "".join(
+                f"• `{h['hash']}` — {h['date']} UTC\n"
+                for h in display_history
+            )
+            embed.add_field(
+                name=_truncate(f"📜 {get_text(lang, 'history_header')}", _LIMIT_FIELD_NAME),
+                value=_truncate(lines or "No history available.", _LIMIT_FIELD_VALUE),
+                inline=False,
+            )
+        else:
+            # For Desktop, we skip the field entirely to keep it clean (as requested)
+            pass
 
     # ── Download field ────────────────────────────────────────────────────────
     # Screenshot: "Direct Download" in bold/italic then link
@@ -665,18 +674,26 @@ class VersionSelect(Select):
         if current_hash and current_hash not in history:
             history.insert(0, current_hash)
             
-        if not history:
-            history.append(current_hash or "unknown-version")
-            
-        cur = current_hash or latest or history[0]
+        # Filter history to only include versions relevant to this platform
+        if platform_key == "AndroidApp":
+            filtered_history = [h for h in history if h.startswith("android-")]
+        elif platform_key == "iOS":
+            filtered_history = [h for h in history if h.startswith("appstore-")]
+        else:
+            # For Windows/Mac, they all start with 'version-' and 'version-' is the common prefix.
+            # But we already fixed the leakage in storage.py. 
+            # We add a filter just in case to avoid 'android-'/'appstore-' showing up here.
+            filtered_history = [h for h in history if h.startswith("version-")]
+
+        cur = current_hash or latest or (filtered_history[0] if filtered_history else "")
         
         options = [
             discord.SelectOption(
-                label=h.replace("version-", ""),
+                label=h.replace("version-", "").replace("android-", "").replace("appstore-", ""),
                 value=h,
                 default=(h == cur),
             )
-            for h in history[:25]
+            for h in filtered_history[:25]
         ]
         
         super().__init__(

@@ -100,15 +100,6 @@ _DEFAULT_GUILD_CONFIG: GuildConfig = {
     "bot_version_channel_id":  None,
 }
 
-_EMPTY_VERSION_STATE: VersionState = {
-    "current":     "",
-    "last_update": "",
-    "last_build":  "",
-    "history":     [],
-    "timestamps":  {},
-    "fflag_count": 0,
-}
-
 # ──────────────────────────────────────────────────────────────────────────────
 #  Thread-safe file lock registry
 #  One lock per path so concurrent reads/writes to different files don't block.
@@ -203,14 +194,30 @@ def _migrate_version_state(raw: Any) -> VersionState:
     Ensure a raw storage value has the full VersionState shape.
     Handles both legacy string values and partially-migrated dicts.
     """
+    # Always start with a fresh copy of the template to avoid cross-contamination
+    state: VersionState = {
+        "current":     "",
+        "last_update": "",
+        "last_build":  "",
+        "history":     [],
+        "timestamps":  {},
+        "fflag_count": 0,
+    }
+
     if not isinstance(raw, dict):
-        # Legacy: stored value was just a plain hash string
-        current = str(raw) if raw else ""
-        return {**_EMPTY_VERSION_STATE, "current": current, "last_update": current}
+        if raw:
+            val = str(raw)
+            state["current"] = val
+            state["last_update"] = val
+        return state
 
-    state: VersionState = {**_EMPTY_VERSION_STATE, **raw}
+    # Merge existing data into the fresh template
+    state.update(raw)
+    
+    # Ensure nested objects are copies if they were just updated from raw
+    state["history"] = list(state.get("history") or [])
+    state["timestamps"] = dict(state.get("timestamps") or {})
 
-    # Back-fill missing fields
     if not state.get("last_update"):
         state["last_update"] = state.get("current", "")
 
@@ -359,9 +366,9 @@ def backfill_history(platform_key: str, entries: list, channel: str = "LIVE") ->
                 state["current"]     = history[0]
                 state["last_update"] = history[0]
 
-            full_data[platform_key] = state
+            full_data[key] = state
             _save_json(VERSIONS_FILE, full_data)
-            log.info("backfill_history: added %d new entries for %s", added, platform_key)
+            log.info("backfill_history: added %d new entries for %s", added, key)
 
     return added
 

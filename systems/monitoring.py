@@ -182,6 +182,45 @@ class MonitoringSystem(commands.Cog):
                         )
                     )
 
+            # ── Extra: Active build detection (DeployHistory.txt) ─────────────
+            if platform_key in _BUILD_DETECTION_PLATFORMS:
+                try:
+                    entries = await loop.run_in_executor(
+                        None, fetch_deploy_history, platform_key, 1 # Only last 24h
+                    )
+                    if entries:
+                        latest_build = entries[0]
+                        state = get_version_data(platform_key, channel="LIVE")
+                        
+                        # We only care if this hash is NOT in our history yet
+                        if latest_build.version_hash not in state.get("history", []):
+                            log.info("🚀 New build detected on CDN: %s (%s)", platform_key, latest_build.version_hash)
+                            
+                            # Convert HistoryEntry to VersionInfo for broadcasting
+                            vi_build = VersionInfo(
+                                platform_key=platform_key,
+                                version=latest_build.version,
+                                version_hash=latest_build.version_hash,
+                                channel="CDN-Build",
+                                source="DeployHistory.txt",
+                                fflag_count=0 
+                            )
+                            
+                            # Persist as a non-official build so we don't update 'current'
+                            update_version(platform_key, vi_build.version_hash, is_official=False)
+                            
+                            broadcasts.append(
+                                self._broadcast(
+                                    platform_key=platform_key,
+                                    vi=vi_build,
+                                    prev_hash=state.get("current", ""),
+                                    is_build=True,
+                                    channel="BUILD",
+                                )
+                            )
+                except Exception as exc:
+                    log.warning("Active build detection failed for %s: %s", platform_key, exc)
+
         # ── Fire all broadcasts in parallel ───────────────────────────────
         if broadcasts:
             results = await asyncio.gather(*broadcasts, return_exceptions=True)
