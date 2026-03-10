@@ -1,0 +1,26 @@
+{
+    "WindowsPlayer": {
+        "current": "version-win1",
+        "last_update": "version-win1",
+        "last_build": "",
+        "history": [
+            "version-win1"
+        ],
+        "timestamps": {
+            "version-win1": "2026-03-10 18:03 UTC"
+        },
+        "fflag_count": 0
+    },
+    "AndroidApp": {
+        "current": "android-1",
+        "last_update": "android-1",
+        "last_build": "",
+        "history": [
+            "android-1"
+        ],
+        "timestamps": {
+            "android-1": "2026-03-10 18:03 UTC"
+        },
+        "fflag_count": 0
+    }
+}

@@ -319,7 +319,7 @@ class DeveloperCommands(commands.Cog):
             platform_key, vi, prev_hash,
             lang=lang, bot_icon=icon, is_build=is_build,
         )
-        view = build_alert_view(platform_key, vi, prev_hash, lang)
+        view = build_alert_view(platform_key, vi, prev_hash, lang, is_build=is_build)
 
         await interaction.followup.send(embed=embed, view=view, ephemeral=False)
 

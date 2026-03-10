@@ -7,7 +7,7 @@ __pycache__/
 logs/
 
 # Datos locales (se regeneran sólo en producción)
-data/
+# data/
 
 # Archivos temporales
 tmp_*.py

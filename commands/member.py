@@ -138,7 +138,7 @@ class VersionHistorySelect(discord.ui.Select):
             self.platform_key, vi, None,
             lang=lang, selected_hash=vi.version_hash, bot_icon=icon,
         )
-        view = create_language_view(self.platform_key, vi, None, lang)
+        view = create_language_view(self.platform_key, vi, None, lang, is_build=False)
         await interaction.response.edit_message(embed=embed, view=view)
 
 
