@@ -609,6 +609,7 @@ class LanguageSelect(Select):
         prev_hash:     Optional[str],
         current_lang:  str,
         current_hash:  Optional[str] = None,
+        is_build:      bool = False,
     ) -> None:
         options = [
             discord.SelectOption(
@@ -629,6 +630,7 @@ class LanguageSelect(Select):
         self.vi           = vi
         self.prev_hash    = prev_hash
         self.current_hash = current_hash
+        self.is_build     = is_build
 
     async def callback(self, interaction: discord.Interaction) -> None:
         new_lang   = self.values[0]
@@ -641,10 +643,12 @@ class LanguageSelect(Select):
             self.platform_key, self.vi, self.prev_hash,
             lang=new_lang, bot_icon=bot_icon,
             selected_hash=self.current_hash,
-            channel=self.vi.channel
+            channel=self.vi.channel,
+            is_build=self.is_build
         )
         new_view   = build_alert_view(
-            self.platform_key, self.vi, self.prev_hash, new_lang, self.current_hash
+            self.platform_key, self.vi, self.prev_hash, new_lang, 
+            self.current_hash, is_build=self.is_build
         )
         try:
             await interaction.response.edit_message(embed=new_embed, view=new_view)
@@ -662,6 +666,7 @@ class VersionSelect(Select):
         prev_hash:    Optional[str],
         current_lang: str,
         current_hash: Optional[str] = None,
+        is_build:     bool = False,
     ) -> None:
         state = get_version_data(platform_key, channel=vi.channel) or {}
         history = (state.get("history") or [])[:]
@@ -706,6 +711,7 @@ class VersionSelect(Select):
         self.vi           = vi
         self.prev_hash    = prev_hash
         self.lang         = current_lang
+        self.is_build     = is_build
 
     async def callback(self, interaction: discord.Interaction) -> None:
         selected_hash = self.values[0]
@@ -718,10 +724,12 @@ class VersionSelect(Select):
         new_embed = build_update_embed(
             self.platform_key, self.vi, self.prev_hash,
             lang=self.lang, selected_hash=selected_hash,
-            bot_icon=bot_icon, channel=self.vi.channel
+            bot_icon=bot_icon, channel=self.vi.channel,
+            is_build=self.is_build
         )
         new_view = build_alert_view(
-            self.platform_key, self.vi, self.prev_hash, self.lang, selected_hash
+            self.platform_key, self.vi, self.prev_hash, self.lang, 
+            selected_hash, is_build=self.is_build
         )
         try:
             await interaction.response.edit_message(embed=new_embed, view=new_view)
@@ -735,13 +743,14 @@ def build_alert_view(
     prev_hash:     Optional[str],
     current_lang:  str = "en",
     current_hash:  Optional[str] = None,
+    is_build:      bool = False,
 ) -> View:
     """Return a persistent View containing both language and version selectors."""
     view = View(timeout=None)
-    view.add_item(LanguageSelect(platform_key, vi, prev_hash, current_lang, current_hash))
+    view.add_item(LanguageSelect(platform_key, vi, prev_hash, current_lang, current_hash, is_build))
     
     view.add_item(VersionSelect(
-        platform_key, vi, prev_hash, current_lang, current_hash
+        platform_key, vi, prev_hash, current_lang, current_hash, is_build
     ))
     
     return view
@@ -752,6 +761,7 @@ def create_language_view(
     vi:            VersionInfo,
     prev_hash:     Optional[str],
     current_lang:  str = "en",
+    is_build:      bool = False,
 ) -> View:
     """Backward-compatible wrapper for build_alert_view."""
-    return build_alert_view(platform_key, vi, prev_hash, current_lang)
+    return build_alert_view(platform_key, vi, prev_hash, current_lang, is_build=is_build)

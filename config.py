@@ -32,10 +32,12 @@ load_dotenv()
 _BASE: Final[Path] = Path(__file__).resolve().parent
 
 DATA_DIR: Final[Path] = _BASE / "data"
+SERVERS_DIR: Final[Path] = DATA_DIR / "servers"
 LOGS_DIR: Final[Path] = _BASE / "logs"
 
 # Ensure directories exist at import time so nothing else has to worry about it
 DATA_DIR.mkdir(parents=True, exist_ok=True)
+SERVERS_DIR.mkdir(parents=True, exist_ok=True)
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 VERSIONS_FILE:      Final[str] = str(DATA_DIR / "versions.json")

@@ -323,7 +323,7 @@ class MonitoringSystem(commands.Cog):
                 history_data=history_data,
                 channel=channel,
             )
-            view = create_language_view(platform_key, vi, prev_hash, lang)
+            view = create_language_view(platform_key, vi, prev_hash, lang, is_build=is_build)
 
             send_tasks.append(
                 self._safe_send(discord_channel, gid=gid_str, content=mention, embed=embed, view=view)

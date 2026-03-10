@@ -305,7 +305,7 @@ class WelcomeSystem(commands.Cog):
         """
         import time
 
-        cfg        = get_guild_config(guild.id)
+        cfg        = get_guild_config(guild.id, guild_name=guild.name)
         new_name   = f"》 Members: {guild.member_count}"
 
         # Resolve target channel: config key → name search
@@ -398,7 +398,7 @@ class WelcomeSystem(commands.Cog):
         """Welcome a new member with a rich embed, optional DM, and auto-roles."""
         await self._trigger_status_update(member.guild)
 
-        cfg = get_guild_config(member.guild.id)
+        cfg = get_guild_config(member.guild.id, guild_name=member.guild.name)
 
         # Assign roles first so the member gets them as soon as possible
         await self._assign_auto_roles(member, cfg)
@@ -430,7 +430,7 @@ class WelcomeSystem(commands.Cog):
         """Update dynamic counters and optionally send a goodbye message."""
         await self._trigger_status_update(member.guild)
 
-        cfg = get_guild_config(member.guild.id)
+        cfg = get_guild_config(member.guild.id, guild_name=member.guild.name)
         if not cfg.get("goodbye_enabled", False):
             return
 

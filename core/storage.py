@@ -32,12 +32,56 @@ import logging
 import os
 import shutil
 import threading
+import re
+from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any, Optional, TypedDict
 
-from config import ANNOUNCEMENTS_FILE, GUILDS_FILE, VERSIONS_FILE
+from config import ANNOUNCEMENTS_FILE, GUILDS_FILE, VERSIONS_FILE, SERVERS_DIR
 
 log = logging.getLogger("BloxPulse.Storage")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Path & Name Helpers
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _sanitize_name(name: Optional[str]) -> str:
+    """Clean a guild name for use as a folder name."""
+    if not name:
+        return "Unknown_Server"
+    # Replace spaces and invalid chars with underscores
+    clean = re.sub(r'[^\w\s-]', '', name).strip()
+    clean = re.sub(r'[-\s]+', '_', clean)
+    return clean or "Unknown_Server"
+
+
+def _get_guild_dir(guild_id: int, guild_name: Optional[str] = None) -> Path:
+    """
+    Resolve the directory for a guild. 
+    Format: data/servers/SanitizedName_ID/
+    """
+    gid_str = str(guild_id)
+    base_dir = Path(SERVERS_DIR)
+    
+    # Try to find existing folder ending with _ID
+    if base_dir.exists():
+        for entry in base_dir.iterdir():
+            if entry.is_dir() and entry.name.endswith(f"_{gid_str}"):
+                return entry
+
+    # If not found, create a new one
+    safe_name = _sanitize_name(guild_name)
+    folder_name = f"{safe_name}_{gid_str}"
+    path = base_dir / folder_name
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _get_guild_config_path(guild_id: int, guild_name: Optional[str] = None) -> str:
+    folder = _get_guild_dir(guild_id, guild_name)
+    return str(folder / "config.json")
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 #  Typed interfaces
@@ -374,65 +418,73 @@ def backfill_history(platform_key: str, entries: list, channel: str = "LIVE") ->
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  Guild configuration
+#  Guild configuration (Refactored for per-server storage)
 # ──────────────────────────────────────────────────────────────────────────────
 
 def get_all_guilds() -> dict[str, GuildConfig]:
-    """Return a snapshot of every guild's configuration dict."""
-    with _lock_for(GUILDS_FILE):
-        return _load_json(GUILDS_FILE)
-
-
-def get_guild_config(guild_id: int) -> GuildConfig:
     """
-    Return the configuration for a single guild, merging defaults for any
-    missing keys so callers never have to handle KeyError / None.
+    Return a snapshot of every guild's configuration dict.
+    Scans the data/servers/ directory.
     """
-    with _lock_for(GUILDS_FILE):
-        data = _load_json(GUILDS_FILE)
+    all_configs = {}
+    if not os.path.exists(SERVERS_DIR):
+        return {}
+        
+    for entry in os.scandir(SERVERS_DIR):
+        if entry.is_dir():
+            # Extract ID from folder name (SanitizedName_ID)
+            match = re.search(r'_(\d+)$', entry.name)
+            if match:
+                gid_str = match.group(1)
+                config_path = os.path.join(entry.path, "config.json")
+                if os.path.exists(config_path):
+                    with _lock_for(config_path):
+                        raw = _load_json(config_path)
+                    all_configs[gid_str] = {**_DEFAULT_GUILD_CONFIG, **raw}
+                    
+    return all_configs
 
-    raw = data.get(str(guild_id), {})
+
+def get_guild_config(guild_id: int, guild_name: Optional[str] = None) -> GuildConfig:
+    """
+    Return the configuration for a single guild.
+    """
+    path = _get_guild_config_path(guild_id, guild_name)
+    with _lock_for(path):
+        raw = _load_json(path)
+
     return {**_DEFAULT_GUILD_CONFIG, **raw}
 
 
-def set_guild_config(guild_id: int, key: str, value: Any) -> bool:
+def set_guild_config(guild_id: int, key: str, value: Any, guild_name: Optional[str] = None) -> bool:
     """
     Set a single configuration key for a guild.
-
-    Creates the guild entry if it does not exist yet.
-    Returns True on successful write.
     """
-    gid = str(guild_id)
-
-    with _lock_for(GUILDS_FILE):
-        data = _load_json(GUILDS_FILE)
-
-        if gid not in data:
-            data[gid] = dict(_DEFAULT_GUILD_CONFIG)
-
-        data[gid][key] = value
-        ok = _save_json(GUILDS_FILE, data)
+    path = _get_guild_config_path(guild_id, guild_name)
+    with _lock_for(path):
+        data = _load_json(path)
+        data[key] = value
+        # Ensure server name is always stored
+        if guild_name:
+            data["server_name"] = guild_name
+        ok = _save_json(path, data)
 
     if not ok:
         log.error("set_guild_config: write failed for guild %s key=%s", guild_id, key)
     return ok
 
 
-def set_guild_config_bulk(guild_id: int, updates: dict[str, Any]) -> bool:
+def set_guild_config_bulk(guild_id: int, updates: dict[str, Any], guild_name: Optional[str] = None) -> bool:
     """
-    Set multiple configuration keys for a guild in a single atomic write.
-    More efficient than calling ``set_guild_config`` in a loop.
+    Set multiple configuration keys for a guild.
     """
-    gid = str(guild_id)
-
-    with _lock_for(GUILDS_FILE):
-        data = _load_json(GUILDS_FILE)
-
-        if gid not in data:
-            data[gid] = dict(_DEFAULT_GUILD_CONFIG)
-
-        data[gid].update(updates)
-        ok = _save_json(GUILDS_FILE, data)
+    path = _get_guild_config_path(guild_id, guild_name)
+    with _lock_for(path):
+        data = _load_json(path)
+        data.update(updates)
+        if guild_name:
+            data["server_name"] = guild_name
+        ok = _save_json(path, data)
 
     if not ok:
         log.error("set_guild_config_bulk: write failed for guild %s", guild_id)
@@ -441,27 +493,64 @@ def set_guild_config_bulk(guild_id: int, updates: dict[str, Any]) -> bool:
 
 def remove_guild(guild_id: int) -> bool:
     """
-    Delete all stored configuration for a guild (called on bot kick/leave).
-    Returns True if the guild was present and removed.
+    Delete all stored configuration for a guild.
     """
-    gid = str(guild_id)
-    with _lock_for(GUILDS_FILE):
-        data = _load_json(GUILDS_FILE)
-        if gid not in data:
+    folder = _get_guild_dir(guild_id)
+    if folder.exists() and folder.is_dir():
+        try:
+            shutil.rmtree(folder)
+            return True
+        except OSError as e:
+            log.error("Failed to remove guild folder %s: %s", folder, e)
             return False
-        del data[gid]
-        return _save_json(GUILDS_FILE, data)
+    return False
+
+
+def _migrate_guilds_if_needed():
+    """Move data from legacy guilds.json to per-server files."""
+    if not os.path.exists(GUILDS_FILE):
+        return
+        
+    try:
+        with _lock_for(GUILDS_FILE):
+            legacy_data = _load_json(GUILDS_FILE)
+            if not legacy_data:
+                return
+                
+            log.info("Migrating legacy guilds data for %d servers...", len(legacy_data))
+            for gid_str, config in legacy_data.items():
+                try:
+                    guild_id = int(gid_str)
+                    # We don't have the name in legacy data easily, 
+                    # use the stored name if it exists or fallback
+                    name = config.get("server_name")
+                    path = _get_guild_config_path(guild_id, name)
+                    with _lock_for(path):
+                        _save_json(path, config)
+                except ValueError:
+                    continue
+            
+            # Archive the old file
+            shutil.move(GUILDS_FILE, GUILDS_FILE + ".migrated")
+            log.info("Migration complete. Legacy file archived.")
+    except Exception as e:
+        log.error("Migration failed: %s", e)
+
+# Run migration on import
+_migrate_guilds_if_needed()
 
 
 def get_all_announcement_channels() -> list[int]:
     """Return every configured announcement channel ID across all guilds."""
-    with _lock_for(GUILDS_FILE):
-        data = _load_json(GUILDS_FILE)
-    return [
-        int(cfg["announcement_channel_id"])
-        for cfg in data.values()
-        if cfg.get("announcement_channel_id")
-    ]
+    channels = []
+    guilds = get_all_guilds()
+    for cfg in guilds.values():
+        if cfg.get("announcement_channel_id"):
+            try:
+                channels.append(int(cfg["announcement_channel_id"]))
+            except (ValueError, TypeError):
+                continue
+    return channels
 
 
 # ──────────────────────────────────────────────────────────────────────────────

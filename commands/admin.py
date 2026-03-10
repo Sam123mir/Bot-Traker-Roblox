@@ -103,9 +103,9 @@ class AdminCommands(commands.Cog):
             )
             return await interaction.followup.send(embed=embed, ephemeral=True)
 
-        set_guild_config(interaction.guild_id, "channel_id", channel.id)
+        set_guild_config(interaction.guild_id, "channel_id", channel.id, guild_name=interaction.guild.name)
         if ping_role:
-            set_guild_config(interaction.guild_id, "ping_role_id", ping_role.id)
+            set_guild_config(interaction.guild_id, "ping_role_id", ping_role.id, guild_name=interaction.guild.name)
 
         embed = _base_embed(
             title="📡  Alerts Channel Configured",
@@ -136,7 +136,7 @@ class AdminCommands(commands.Cog):
             )
             return await interaction.followup.send(embed=embed, ephemeral=True)
 
-        set_guild_config(interaction.guild_id, "announcement_channel_id", channel.id)
+        set_guild_config(interaction.guild_id, "announcement_channel_id", channel.id, guild_name=interaction.guild.name)
         cfg  = get_guild_config(interaction.guild_id)
         lang = cfg.get("language", "en")
 
@@ -160,7 +160,7 @@ class AdminCommands(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         icon = _bot_icon(interaction)
 
-        set_guild_config(interaction.guild_id, "member_count_channel_id", channel.id)
+        set_guild_config(interaction.guild_id, "member_count_channel_id", channel.id, guild_name=interaction.guild.name)
 
         # Perform an immediate update so the user sees it working right away
         count = interaction.guild.member_count
@@ -250,7 +250,7 @@ class AdminCommands(commands.Cog):
                 "api_status_android_id":   ch_android.id,
                 "api_status_ios_id":       ch_ios.id,
                 "bot_version_channel_id":  ch_version.id,
-            })
+            }, guild_name=guild.name)
 
             embed = _base_embed(
                 title="🚀  Server Template Deployed",
@@ -305,7 +305,7 @@ class AdminCommands(commands.Cog):
             updates["goodbye_channel_id"] = goodbye_channel.id
 
         from core.storage import set_guild_config_bulk
-        set_guild_config_bulk(interaction.guild_id, updates)
+        set_guild_config_bulk(interaction.guild_id, updates, guild_name=interaction.guild.name)
 
         embed = _base_embed(
             title="👋  Welcome System Updated",
@@ -379,7 +379,7 @@ class AdminCommands(commands.Cog):
     @has_manage_guild()
     async def language(self, interaction: discord.Interaction, lang: str):
         await interaction.response.defer(ephemeral=True)
-        set_guild_config(interaction.guild_id, "language", lang)
+        set_guild_config(interaction.guild_id, "language", lang, guild_name=interaction.guild.name)
         icon = _bot_icon(interaction)
 
         names = {
