@@ -7,7 +7,12 @@ __pycache__/
 logs/
 
 # Datos locales (se regeneran sólo en producción)
-# data/
+# Datos locales (hacer track para sync GitHub Render -> Main)
+!data/**/*.json
+!data/servers/**/*.json
+!data/versions.json
+!data/guilds.json
+!data/announcements.json
 
 # Archivos temporales
 tmp_*.py

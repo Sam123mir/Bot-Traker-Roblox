@@ -172,15 +172,18 @@ class MonitoringSystem(commands.Cog):
                         )
 
                     await self._persist_state(platform_key, channel, vi)
-                    broadcasts.append(
-                        self._broadcast(
-                            platform_key=platform_key,
-                            vi=vi,
-                            prev_hash=old_hash,
-                            is_build=(channel != "LIVE"),
-                            channel=channel,
+                    
+                    # Only broadcast if there was an actual version change, not just FFlags
+                    if is_ver_change:
+                        broadcasts.append(
+                            self._broadcast(
+                                platform_key=platform_key,
+                                vi=vi,
+                                prev_hash=old_hash,
+                                is_build=(channel != "LIVE"),
+                                channel=channel,
+                            )
                         )
-                    )
 
             # ── Extra: Active build detection (DeployHistory.txt) ─────────────
             if platform_key in _BUILD_DETECTION_PLATFORMS:
