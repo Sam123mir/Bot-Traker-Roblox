@@ -399,23 +399,45 @@ class DeveloperCommands(commands.Cog):
 
     # ── /sync ─────────────────────────────────────────────────────────────────
 
-    @app_commands.command(name="sync", description="⚙️  Sync slash commands globally and clear guild cache  (Owner only).")
+    @app_commands.command(name="sync", description="⚙️  Sync slash commands globally and load new cogs  (Owner only).")
     @is_owner()
     async def sync_cmds(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         icon = _bot_icon(interaction)
 
         try:
-            # Clear any guild-specific ghost commands
+            # 1. Dynamically Load/Reload all extensions first
+            import pathlib
+            base_dir = pathlib.Path(__file__).resolve().parent.parent
+            loaded_count = 0
+            
+            for directory in ("systems", "commands"):
+                folder = base_dir / directory
+                if folder.is_dir():
+                    for f in folder.glob("*.py"):
+                        if not f.name.startswith("__"):
+                            ext = f"{directory}.{f.stem}"
+                            try:
+                                if ext in self.bot.extensions:
+                                    await self.bot.reload_extension(ext)
+                                else:
+                                    await self.bot.load_extension(ext)
+                                loaded_count += 1
+                            except Exception as plugin_exc:
+                                logger.warning("Failed to load/reload %s: %s", ext, plugin_exc)
+
+            # 2. Clear any guild-specific ghost commands
             self.bot.tree.clear_commands(guild=interaction.guild)
             await self.bot.tree.sync(guild=interaction.guild)
-            # Push global commands
+            
+            # 3. Push global commands
             synced = await self.bot.tree.sync()
 
             embed = _base_embed(
-                title="⚙️  Commands Synced",
+                title="⚙️  Commands Synced & Reloaded",
                 description=(
-                    f"Successfully registered **{len(synced)}** global command(s).\n"
+                    f"Successfully loaded/reloaded **{loaded_count}** cog(s).\n"
+                    f"Registered **{len(synced)}** global command(s).\n"
                     f"Guild-specific command cache has been cleared.\n\u200b"
                 ),
                 color=COLOR_SUCCESS,
