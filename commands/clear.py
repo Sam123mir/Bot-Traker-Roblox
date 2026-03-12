@@ -70,8 +70,7 @@ class ClearCommand(commands.Cog):
             # We fetch amount + 1 because we don't want to count the invisible interaction message itself
             deleted = await interaction.channel.purge(
                 limit=amount,
-                check=check_msg,
-                custom_error_handling=False # Let errors bubble up to handle them nicely
+                check=check_msg
             )
             deleted_count = len(deleted)
             
